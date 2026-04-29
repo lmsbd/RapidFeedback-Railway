@@ -8,7 +8,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -28,9 +27,10 @@ public class GroupMarkRecordPO {
 
     private Long groupId;
 
+    /** user.id of the marker who wrote this group comment */
     private Long markerId;
 
-    private BigDecimal totalScore;
+    private String comment;
 
     private LocalDateTime markTime;
 }

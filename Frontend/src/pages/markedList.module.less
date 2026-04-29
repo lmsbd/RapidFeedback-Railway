@@ -43,8 +43,11 @@
 // ========== Main Content ==========
 .mainContent {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(520px, 1fr) minmax(520px, 1fr);
   gap: 24px;
+  overflow-x: auto;
+  align-items: start;
+  -webkit-overflow-scrolling: touch;
 }
 
 // ========== Card Section ==========
@@ -73,7 +76,6 @@
 
   .ant-table {
     border-radius: 8px;
-    overflow: hidden;
   }
 }
 
@@ -101,7 +103,7 @@
 // ========== Responsive Design ==========
 @media (max-width: 1024px) {
   .mainContent {
-    grid-template-columns: 1fr;
+    padding-bottom: 8px;
   }
 }
 
@@ -143,5 +145,3 @@
   outline: 2px solid @secondary-blue;
   outline-offset: 2px;
 }
-
-

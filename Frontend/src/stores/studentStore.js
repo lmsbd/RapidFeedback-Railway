@@ -1,9 +1,71 @@
 import { makeAutoObservable, toJS } from 'mobx';
+/**
+ * studentStore.groups
+ * create groups payload 
+ * @typedef {Object} ProjectGroupPayload
+ * @property {string} groupName
+ * @property {(number|string)[]} studentIds
+ * @example
+ * const payload = {
+ *   groupName: 'Group 1',
+ *   studentIds: [1, 2, 3],
+ * };
+ */
 
+/**
+ * studentStore.groupStudents
+ * group card / preview group (studentStore.groupStudents, same shape as page state `groups`)
+ * @typedef {Object} FormGroupWithStudents
+ * @property {string} groupName
+ * @property {(number|string)[]} studentIds
+ * @property {FormGroupStudentRow[]} students
+ * @example
+ * const group = {
+ *   groupName: 'Group 1',
+ *   studentIds: [1, 2, 3],
+ *   students: [
+ *     { studentId: 1, studentName: 'Alice' },
+ *     { studentId: 2, studentName: 'Bob' },
+ *     { studentId: 3, studentName: 'Charlie' },
+ *   ],
+ * 
+ * {
+  groupId: team.id,              // Optional; present only when team.id exists
+  groupName: team.name ?? '',
+  markerIds: extractMarkerIds(team.markers), // number[] from team.markers id/userId
+  studentIds: students.map((s) => s.studentId),
+  students: students.map((s) => ({
+    ...s,                        // Preserve all original fields in students[]
+    studentName: `${s.firstName ?? ''} ${s.surname ?? ''}`.trim(),
+  })),
+}
+
+ */
+
+/**
+ * subjectStudents
+ * @typedef {Object} SubjectStudent
+ * @property {string} studentId
+ * @property {string} studentName
+ * @property {string} email
+ * @property {string} firstName
+ * @property {string} surname
+ * @example
+ * const subjectStudent = {
+ *   id: 1,
+ *   studentId: 150001,
+ *   email: 'alice@example.com',
+ *   firstName: 'Alice',
+ *   surname: 'Smith',
+ *   totalScore: 0,
+ * };
+ */
 class StudentStore {
   students = [];
   groupStudents = [];
+  // api: getStudentListBySubject
   subjectStudents = [];
+  // api: createProject
   groups = [];
 
   constructor() {
@@ -71,7 +133,7 @@ class StudentStore {
 
   /**
    * Create group list from CSV data.
-   * Only studentId and groupName from CSV are used for grouping.
+   * Uses studentId and group column: `groupName` or `group` (same meaning).
    * Student names are always taken from subjectStudentsList (authoritative source)
    * to avoid displaying incorrect names from CSV.
    */
@@ -83,7 +145,7 @@ class StudentStore {
     );
 
     students.forEach((student) => {
-      const groupName = student.groupName;
+      const groupName = student.groupName ?? student.group;
       if (!groupMap.has(groupName)) {
         groupMap.set(groupName, []);
       }
@@ -116,6 +178,13 @@ class StudentStore {
      // this.groupStudents.push(group);
     });
     return groups;
+  }
+  getUnGroupedStudents(groups) {
+    const assigned = new Set();
+    (groups || []).forEach((g) => {
+      (g.studentIds || []).forEach((id) => assigned.add(String(id)));
+    });
+    return this.subjectStudents.filter((s) => !assigned.has(String(s.studentId)));
   }
   randomFormGroup(size) {
     const shuffledStudents = [...this.subjectStudents].sort(() => Math.random() - 0.5);

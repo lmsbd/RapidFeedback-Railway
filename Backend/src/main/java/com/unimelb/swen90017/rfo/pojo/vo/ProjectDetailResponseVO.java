@@ -3,6 +3,7 @@ package com.unimelb.swen90017.rfo.pojo.vo;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -24,4 +25,11 @@ public class ProjectDetailResponseVO {
 
     /** Assigned markers (user id, username as name, email) */
     private List<UserDetailVO> markers;
+
+    /**
+     * Theoretical maximum score this project can obtain:
+     * Σ (maximum_mark × weighting / 100) across all active assessment criteria,
+     * rounded HALF_UP to 2 decimals.
+     */
+    private BigDecimal weightedMaxScore;
 }

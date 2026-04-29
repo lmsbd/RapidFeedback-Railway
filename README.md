@@ -1,5 +1,5 @@
 # Tool for Rapid Feedback on Oral Presentations
-This respossitoory contains all source code, documents and delivrrbles for Tool for Rapid Feedback on Oral Presentations.
+This repository contains all source code, documents and deliverables for Tool for Rapid Feedback on Oral Presentations.
 
 ## Project description
 Tool for Rapid Feedback on Oral Presentations (RFO) is a project designed to enhance the oral presentation and communication skills of engineering students. Oral presentations are essential for academic and professional success, yet opportunities to practice are limited and traditional assessment methods often fail to meet students’ development needs. By providing a platform for timely and accessible feedback, this project aims to offer an efficient and engaging solution to support continuous improvement in students’ presentation skills.
@@ -7,8 +7,8 @@ Tool for Rapid Feedback on Oral Presentations (RFO) is a project designed to enh
 ## Key links
 - [Documents](https://github.com/SWEN90017-2025-SM2/RapidFeedback/wiki)
 
-## Project Team and Stakeholder
-| Name            | Role                 | Email                          | studentID                      |
+## Project Team and Stakeholders
+| Name            | Role                 | Email                          | student ID                     |
 |-----------------|----------------------|--------------------------------|--------------------------------|
 | Mercy Meng      | Product Owner        | qingxinm@student.unimelb.edu.au |1567542|
 | Dwyane Luo      | Scrum Master         | haokunl2@student.unimelb.edu.au |1568121|

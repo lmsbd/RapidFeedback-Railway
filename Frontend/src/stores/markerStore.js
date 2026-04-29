@@ -2,6 +2,7 @@ import { makeAutoObservable } from 'mobx';
 
 class MarkerStore {
   selectedMarkerIds = [];
+  selectedMarkers = [];
   get MarkerList() {
     return this.selectedMarkerIds.slice();
   }
@@ -9,12 +10,84 @@ class MarkerStore {
     makeAutoObservable(this);
   }
 
+  normalizeId(value) {
+    if (value == null) return null;
+    const str = String(value).trim();
+    if (!str) return null;
+    const num = Number(str);
+    return Number.isNaN(num) ? str : num;
+  }
+
   setSelected(ids) {
-    this.selectedMarkerIds = ids;
+    const nextIds = Array.isArray(ids) ? ids : [];
+    const normalizedIds = nextIds
+      .map((id) => this.normalizeId(id))
+      .filter((id) => id != null);
+
+    this.selectedMarkerIds = normalizedIds;
+    const idSet = new Set(normalizedIds);
+    this.selectedMarkers = this.selectedMarkers.filter((marker) =>
+      idSet.has(this.normalizeId(marker?.id ?? marker?.userId))
+    );
+  }
+
+  setSelectedWithDetails(markers) {
+    const list = Array.isArray(markers) ? markers : [];
+    const normalized = [];
+    const seen = new Set();
+
+    list.forEach((item) => {
+      const id = this.normalizeId(item?.id ?? item?.userId ?? item);
+      if (id == null || seen.has(id)) return;
+      seen.add(id);
+      normalized.push({
+        id,
+        userId: id,
+        userName: item?.userName ?? item?.name ?? '',
+        role: item?.role,
+        email: item?.email,
+      });
+    });
+
+    this.selectedMarkerIds = normalized.map((item) => item.id);
+    this.selectedMarkers = normalized;
+  }
+
+  upsertSelectedMarkers(markers) {
+    const list = Array.isArray(markers) ? markers : [];
+    const selectedIdSet = new Set(
+      (this.selectedMarkerIds || [])
+        .map((id) => this.normalizeId(id))
+        .filter((id) => id != null)
+    );
+    const markerMap = new Map();
+
+    (this.selectedMarkers || []).forEach((m) => {
+      const id = this.normalizeId(m?.id ?? m?.userId);
+      if (id == null) return;
+      markerMap.set(id, m);
+    });
+
+    list.forEach((item) => {
+      const id = this.normalizeId(item?.id ?? item?.userId ?? item);
+      if (id == null || !selectedIdSet.has(id)) return;
+      markerMap.set(id, {
+        id,
+        userId: id,
+        userName: item?.userName ?? item?.name ?? '',
+        role: item?.role,
+        email: item?.email,
+      });
+    });
+
+    this.selectedMarkers = Array.from(markerMap.values()).filter((m) =>
+      selectedIdSet.has(this.normalizeId(m?.id ?? m?.userId))
+    );
   }
 
   clearSelected() {
     this.selectedMarkerIds = [];
+    this.selectedMarkers = [];
   }
 }
 

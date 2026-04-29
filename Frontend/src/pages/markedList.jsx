@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, history, useLocation } from 'umi';
 import { Button, Card, Table, Typography, message, Empty } from 'antd';
-import { EditOutlined, EyeOutlined } from '@ant-design/icons';
+import { EditOutlined, EyeOutlined, AuditOutlined } from '@ant-design/icons';
 import BackButton from '../components/BackButton/BackButton';
 import styles from './markedList.module.less';
 
@@ -13,6 +13,7 @@ import {
 } from '../apis/getStudents';
 import { getProjectDetail } from '../apis/getProjectDetail';
 import subjectStore from '../stores/subjectStore';
+import userStore from '../stores/userStore';
 
 const { Title, Text } = Typography;
 
@@ -31,6 +32,16 @@ function toScoreText(value) {
   return Number.isFinite(num) ? num.toFixed(2) : '-';
 }
 
+function clampPaginationState(prev, totalItems) {
+  const safePageSize =
+    Number.isFinite(prev?.pageSize) && prev.pageSize > 0 ? prev.pageSize : 10;
+  const totalPages = Math.max(1, Math.ceil((totalItems || 0) / safePageSize));
+  const safeCurrent =
+    Number.isFinite(prev?.current) && prev.current > 0 ? prev.current : 1;
+  if (safeCurrent <= totalPages && safePageSize === prev?.pageSize) return prev;
+  return { current: Math.min(safeCurrent, totalPages), pageSize: safePageSize };
+}
+
 export default function MarkedList() {
   const { projectId } = useParams();
   const [loading, setLoading] = useState(false);
@@ -39,6 +50,14 @@ export default function MarkedList() {
   const [projectType, setProjectType] = useState('individual');
   const [projectInfo, setProjectInfo] = useState(null);
   const [subjectName, setSubjectName] = useState('');
+  const [unmarkedTablePagination, setUnmarkedTablePagination] = useState({
+    current: 1,
+    pageSize: 10,
+  });
+  const [markedTablePagination, setMarkedTablePagination] = useState({
+    current: 1,
+    pageSize: 10,
+  });
   const location = useLocation();
   const routeProjectName = location.state?.projectName || '';
   const routeProjectType = location.state?.projectType || '';
@@ -141,22 +160,73 @@ export default function MarkedList() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    setUnmarkedTablePagination((prev) => ({ ...prev, current: 1 }));
+    setMarkedTablePagination((prev) => ({ ...prev, current: 1 }));
+  }, [projectType]);
+
+  useEffect(() => {
+    setUnmarkedTablePagination((prev) =>
+      clampPaginationState(prev, unmarked.length)
+    );
+  }, [unmarked.length]);
+
+  useEffect(() => {
+    setMarkedTablePagination((prev) => clampPaginationState(prev, marked.length));
+  }, [marked.length]);
+
+  const unmarkedPagination = useMemo(
+    () => ({
+      current: unmarkedTablePagination.current,
+      pageSize: unmarkedTablePagination.pageSize,
+      showSizeChanger: true,
+      pageSizeOptions: ['5', '10', '20', '50'],
+      onChange: (nextPage, nextPageSize) => {
+        setUnmarkedTablePagination((prev) => ({
+          current: nextPageSize !== prev.pageSize ? 1 : nextPage,
+          pageSize: nextPageSize,
+        }));
+      },
+    }),
+    [unmarkedTablePagination.current, unmarkedTablePagination.pageSize]
+  );
+
+  const markedPagination = useMemo(
+    () => ({
+      current: markedTablePagination.current,
+      pageSize: markedTablePagination.pageSize,
+      showSizeChanger: true,
+      pageSizeOptions: ['5', '10', '20', '50'],
+      onChange: (nextPage, nextPageSize) => {
+        setMarkedTablePagination((prev) => ({
+          current: nextPageSize !== prev.pageSize ? 1 : nextPage,
+          pageSize: nextPageSize,
+        }));
+      },
+    }),
+    [markedTablePagination.current, markedTablePagination.pageSize]
+  );
+
   const handleOpenMarkPage = useCallback(
     (record, mode) => {
-      const params = new URLSearchParams({
-        projectId: String(projectId),
-        type: mode,
-      });
-
       if (isGroupProject) {
-        params.set('groupId', String(record.id));
-        params.set('groupName', record.name || 'Group');
+        const params = new URLSearchParams({
+          projectId: String(projectId),
+          groupId: String(record.id),
+          groupName: record.name || 'Group',
+          type: mode,
+        });
+        history.push(`/groupMark?${params.toString()}`);
       } else {
-        params.set('individualId', String(record.id));
-        params.set('studentName', getStudentName(record) || 'Student');
+        const params = new URLSearchParams({
+          projectId: String(projectId),
+          individualId: String(record.id),
+          studentId: String(record.studentId ?? ''),
+          studentName: getStudentName(record) || 'Student',
+          type: mode,
+        });
+        history.push(`/mark?${params.toString()}`);
       }
-
-      history.push(`/mark?${params.toString()}`);
     },
     [isGroupProject, projectId]
   );
@@ -281,12 +351,6 @@ export default function MarkedList() {
         dataIndex: 'name',
       },
       {
-        title: 'Total Score',
-        dataIndex: 'totalScore',
-        width: 120,
-        render: (v) => toScoreText(v),
-      },
-      {
         title: 'Action',
         key: 'action',
         width: 120,
@@ -346,6 +410,7 @@ export default function MarkedList() {
             size="small"
             dataSource={members}
             columns={teamStudentColumns}
+            scroll={{ x: 'max-content' }}
             pagination={false}
           />
         );
@@ -384,13 +449,29 @@ export default function MarkedList() {
             ? `${subjectName} - ${projectInfo.name}`
             : 'Marked List'}
         </Title>
+        {String(userStore.role) === '1' && (
+          <Button
+            type="primary"
+            icon={<AuditOutlined />}
+            className={styles.saveButton}
+            onClick={() =>
+              history.push(`/finalMark/${projectId}`, {
+                projectName: projectInfo?.name || '',
+                projectType,
+                subjectName,
+              })
+            }
+          >
+            Final Mark
+          </Button>
+        )}
       </div>
 
       <div className={styles.mainContent}>
         <Card
           className={styles.projectSection}
           title={<Text strong>{unmarkedTitle}</Text>}
-          bordered
+          variant
         >
           {unmarked.length > 0 ? (
             <Table
@@ -398,7 +479,8 @@ export default function MarkedList() {
               size="middle"
               dataSource={unmarked}
               columns={activeUnmarkedColumns}
-              pagination={{ pageSize: 8 }}
+              scroll={{ x: 'max-content' }}
+              pagination={unmarkedPagination}
               loading={loading}
               expandable={isGroupProject ? groupExpandable : undefined}
             />
@@ -413,7 +495,7 @@ export default function MarkedList() {
         <Card
           className={styles.projectSection}
           title={<Text strong>{markedTitle}</Text>}
-          bordered
+          variant
         >
           {marked.length > 0 ? (
             <Table
@@ -421,7 +503,8 @@ export default function MarkedList() {
               size="middle"
               dataSource={marked}
               columns={activeMarkedColumns}
-              pagination={{ pageSize: 8 }}
+              scroll={{ x: 'max-content' }}
+              pagination={markedPagination}
               loading={loading}
               expandable={isGroupProject ? groupExpandable : undefined}
             />

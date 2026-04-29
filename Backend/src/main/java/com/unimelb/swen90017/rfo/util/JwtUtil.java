@@ -15,7 +15,7 @@ import java.util.Map;
 @Component
 public class JwtUtil {
 
-    // ==================== 配置属性 ====================
+    // ==================== Configuration ====================
 
     @Value("${jwt.secret}")
     private String secret;
@@ -23,7 +23,7 @@ public class JwtUtil {
     @Value("${jwt.expiration}")
     private Long expiration;
 
-    // Token 中的字段名常量
+    // Token claim name constants
     private static final String CLAIM_USER_ID = "userId";
     private static final String CLAIM_ROLE = "role";
     private static final String CLAIM_EMAIL = "email";
@@ -42,7 +42,7 @@ public class JwtUtil {
 
         return Jwts.builder()
                 .claims(claims)
-                .subject(email)  // 主题设为邮箱
+                .subject(email)  // Set subject to email
                 .issuedAt(now)
                 .expiration(expirationDate)
                 .signWith(getSigningKey())

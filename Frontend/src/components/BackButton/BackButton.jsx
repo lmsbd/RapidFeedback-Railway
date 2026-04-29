@@ -22,15 +22,18 @@ const BackButton = ({
   };
 
   return (
-    <Button
-      icon={<ArrowLeftOutlined />}
-      onClick={handleClick}
-      className={`${styles.backButton} ${className}`}
-      {...props}
-      size={'large'}
-    >
-      {text}
-    </Button>
+    <div className={styles.backButtonContainer}>
+      <Button
+        icon={<ArrowLeftOutlined />}
+        onClick={handleClick}
+        className={`${styles.backButton} ${className}`}
+        {...props}
+        size={'large'}
+      >
+        {text}
+      </Button>
+    </div>
+
   );
 };
 

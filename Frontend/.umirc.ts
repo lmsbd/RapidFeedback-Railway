@@ -49,16 +49,32 @@ export default defineConfig({
           component: 'createProject',
         },
         {
+          path: '/:subjectId/editProject/:projectId',
+          component: 'editProject',
+        },
+        {
+          path: '/setting',
+          component: 'setting',
+        },
+        {
           path: '/markedList/:projectId',
           component: 'markedList',
         },
         {
-          path: '/viewProject/:projectId',
+          path: '/:subjectId/viewProject/:projectId',
           component: 'viewProject',
+        },
+        {
+          path: '/groupMark',
+          component: 'groupMark',
         },
         {
           path: '/mark',
           component: 'mark',
+        },
+        {
+          path: '/finalMark/:projectId',
+          component: 'finalMark',
         },
         {
           path: '/:subjectId/formGroups',
@@ -72,6 +88,10 @@ export default defineConfig({
       target: 'http://localhost:8076/rfo/api',
       changeOrigin: true,
       pathRewrite: { '^/api': '' },
+    },
+    '/avatars': {
+      target: 'http://localhost:8076/rfo',
+      changeOrigin: true,
     },
   },
   npmClient: 'pnpm',

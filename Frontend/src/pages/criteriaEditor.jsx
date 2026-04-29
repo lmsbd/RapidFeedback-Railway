@@ -1,19 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  Button, 
-  Typography, 
-  Form, 
-  InputNumber, 
-  Slider, 
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Alert,
+  Card,
+  Button,
+  Typography,
+  Form,
+  InputNumber,
+  Slider,
   Checkbox,
   Row,
   Col,
   Divider,
   message,
-  Spin
+  Spin,
 } from 'antd';
-import { ArrowLeftOutlined, SaveOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  ArrowLeftOutlined,
+  SaveOutlined,
+  MinusOutlined,
+  PlusOutlined,
+} from '@ant-design/icons';
 import { Radio } from 'antd';
 import { history, useLocation } from 'umi';
 import { observer } from 'mobx-react-lite';
@@ -21,7 +27,7 @@ import { useStores } from '@/stores';
 import { getTemplateElements } from '@/apis/getTemplateElements';
 import styles from './criteriaEditor.module.less';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 // Custom component to sync InputNumber and Slider
 const WeightingInput = ({ value = 0, onChange }) => {
@@ -31,17 +37,17 @@ const WeightingInput = ({ value = 0, onChange }) => {
 
   return (
     <div className={styles.weightingInput}>
-      <InputNumber 
-        min={0} 
-        max={100} 
-        formatter={val => `${val}%`}
-        parser={val => val.replace('%', '')}
+      <InputNumber
+        min={0}
+        max={100}
+        formatter={(val) => `${val}%`}
+        parser={(val) => val.replace('%', '')}
         className={styles.numberInput}
         value={value}
         onChange={handleChange}
       />
-      <Slider 
-        min={0} 
+      <Slider
+        min={0}
         max={100}
         className={styles.sliderInput}
         value={value}
@@ -52,8 +58,14 @@ const WeightingInput = ({ value = 0, onChange }) => {
 };
 
 const CriteriaEditor = observer(() => {
-  const { assessmentStore } = useStores();
-  
+  const { assessmentStore, projectStore } = useStores();
+  const location = useLocation();
+  const fromEditProjectId = useMemo(() => {
+    const params = new URLSearchParams(location.search || '');
+    const value = params.get('fromEditProject');
+    return value ? String(value) : null;
+  }, [location.search]);
+
   // State for template elements from backend
   const [elements, setElements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -81,10 +93,11 @@ const CriteriaEditor = observer(() => {
         setElements(response.data);
         // Set default values for each element
         const initialValues = {};
-        response.data.forEach(element => {
+        response.data.forEach((element) => {
           initialValues[`weighting_${element.id}`] = element.weighting || 0;
           initialValues[`maxMark_${element.id}`] = element.maximumMark || 10;
-          initialValues[`markIncrement_${element.id}`] = element.markIncrements || 0.5;
+          initialValues[`markIncrement_${element.id}`] =
+            element.markIncrements || 0.5;
         });
         form.setFieldsValue(initialValues);
       } else {
@@ -102,21 +115,40 @@ const CriteriaEditor = observer(() => {
   const syncWithAssessmentStore = () => {
     const selectedIds = new Set();
     const formValues = {};
-    
+    const templateById = new Map(elements.map((el) => [el.id, el]));
+    const templateByName = new Map(
+      elements.map((el) => [
+        String(el.name || '')
+          .trim()
+          .toLowerCase(),
+        el,
+      ])
+    );
+
     // Process each element in assessmentStore
-    assessmentStore.elementList.forEach(storeElement => {
-      const elementId = storeElement.elementId;
+    assessmentStore.elementList.forEach((storeElement) => {
+      const rawId = storeElement.elementId;
+      const normalizedName = String(
+        storeElement.Name ?? storeElement.name ?? ''
+      )
+        .trim()
+        .toLowerCase();
+      const resolvedTemplate =
+        templateById.get(rawId) || templateByName.get(normalizedName);
+
+      if (!resolvedTemplate) return;
+      const elementId = resolvedTemplate.id;
       selectedIds.add(elementId);
-      
+
       // Set form values from store
       formValues[`weighting_${elementId}`] = storeElement.weighting;
       formValues[`maxMark_${elementId}`] = storeElement.maximumMark;
       formValues[`markIncrement_${elementId}`] = storeElement.markIncrements;
     });
-    
+
     // Update selected elements state
     setSelectedElements(selectedIds);
-    
+
     // Update form values
     form.setFieldsValue(formValues);
   };
@@ -133,6 +165,10 @@ const CriteriaEditor = observer(() => {
       newSelected.delete(elementId);
     }
     setSelectedElements(newSelected);
+    const names = Array.from(newSelected).map((id) => `weighting_${id}`);
+    if (names.length > 0) {
+      form.validateFields(names).catch(() => {});
+    }
   };
 
   const handleSave = () => {
@@ -141,41 +177,115 @@ const CriteriaEditor = observer(() => {
       return;
     }
 
-    form.validateFields().then(values => {
-      // Build the elements array in the specified format
-      const selectedElementsData = Array.from(selectedElements).map(elementId => {
-        const element = elements.find(e => e.id === elementId);
-        return {
-          elementId: elementId,
-          Name: element.name,
-          weighting: values[`weighting_${elementId}`],
-          maximumMark: values[`maxMark_${elementId}`],
-          markIncrements: values[`markIncrement_${elementId}`]
-        };
-      });
-      
-      // Save to assessmentStore
-      assessmentStore.setElements(selectedElementsData);
-      
-      // Show success message and redirect back
-      message.success('Assessment criteria saved successfully');
-      history.back();
-    }).catch(err => {
-      console.error('Validation failed:', err);
-      message.error('Please fix all validation errors before saving');
+    // Check for decimal values in Maximum Mark fields
+    const formValues = form.getFieldsValue();
+    const fieldsWithDecimals = [];
+    Array.from(selectedElements).forEach((elementId) => {
+      const fieldName = `maxMark_${elementId}`;
+      const value = formValues[fieldName];
+      if (value !== null && value !== undefined && !Number.isInteger(value)) {
+        fieldsWithDecimals.push(fieldName);
+      }
     });
+
+    if (fieldsWithDecimals.length > 0) {
+      message.error('Maximum Mark must be a whole number (integer). Please fix the marked fields.');
+      // Scroll to and focus on the first field with an error
+      form.scrollToField(fieldsWithDecimals[0], { behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    form
+      .validateFields()
+      .then((values) => {
+        const hasZeroWeightingSelected = Array.from(selectedElements).some(
+          (elementId) => Number(values[`weighting_${elementId}`] || 0) === 0
+        );
+        const effectiveSelectedIds = Array.from(selectedElements).filter(
+          (elementId) => Number(values[`weighting_${elementId}`] || 0) > 0
+        );
+
+        if (effectiveSelectedIds.length === 0) {
+          message.warning(
+            'All selected criteria have 0% weighting. Criteria with 0% weighting are treated as not added and will not be saved. Please set at least one weighting above 0%.'
+          );
+          return;
+        }
+
+        if (hasZeroWeightingSelected) {
+          message.info({
+            key: 'criteria-zero-weighting',
+            content:
+              'Selected criteria with 0% weighting will be ignored and not saved.',
+          });
+        }
+
+        // Build the elements array in the specified format
+        const selectedElementsData = effectiveSelectedIds
+          .map((elementId) => {
+            const element = elements.find((e) => e.id === elementId);
+            if (!element) return null;
+            return {
+              elementId: elementId,
+              Name: element.name,
+              weighting: values[`weighting_${elementId}`],
+              maximumMark: values[`maxMark_${elementId}`],
+              markIncrements: values[`markIncrement_${elementId}`],
+            };
+          })
+          .filter(Boolean);
+
+        // Save to assessmentStore
+        assessmentStore.setElements(selectedElementsData);
+
+        // Keep edit-project cache in sync so returning page won't restore stale criteria.
+        if (fromEditProjectId) {
+          const cached = projectStore.getEditProjectDetail(fromEditProjectId);
+          if (cached) {
+            const nextAssessment = selectedElementsData.map((item) => ({
+              elementId: item.elementId,
+              name: item.Name,
+              weighting: item.weighting,
+              maxMark: item.maximumMark,
+              markIncrements: item.markIncrements,
+            }));
+            const firstDesc = Array.isArray(cached.description)
+              ? cached.description[0] || {}
+              : {};
+            projectStore.setEditProjectDetail(fromEditProjectId, {
+              ...cached,
+              description: [
+                {
+                  ...firstDesc,
+                  assessment: nextAssessment,
+                },
+              ],
+            });
+          }
+        }
+
+        // Show success message and redirect back
+        message.success('Assessment criteria saved successfully');
+        history.back();
+      })
+      .catch((err) => {
+        console.error('Validation failed:', err);
+        message.error('Please fix all validation errors before saving');
+      });
   };
 
-  const validateWeightings = (_, value) => {
-    // Calculate total weighting for selected elements only
+  const validateWeightings = () => {
+    // Calculate total weighting for selected elements only.
+    // Treat weighting=0 as effectively not selected.
     let totalWeighting = 0;
-    selectedElements.forEach(elementId => {
+    selectedElements.forEach((elementId) => {
       const fieldName = `weighting_${elementId}`;
       const fieldValue = form.getFieldValue(fieldName);
-      totalWeighting += Number(fieldValue || 0);
+      const num = Number(fieldValue || 0);
+      if (num > 0) totalWeighting += num;
     });
-    
-    if (selectedElements.size > 0 && totalWeighting !== 100) {
+
+    if (totalWeighting > 0 && totalWeighting !== 100) {
       return Promise.reject('Total weighting must equal 100%');
     }
     return Promise.resolve();
@@ -217,26 +327,45 @@ const CriteriaEditor = observer(() => {
 
       {/* Main Content */}
       <div className={styles.mainContent}>
+        <Alert
+          type="info"
+          showIcon
+          closable
+          style={{ marginBottom: 16 }}
+          message="Note: Criteria with 0% weighting are treated as not added and will not be saved."
+        />
         <Form
           form={form}
           layout="vertical"
           className={styles.criteriaForm}
+          onValuesChange={() => {
+            const names = Array.from(selectedElements).map(
+              (id) => `weighting_${id}`
+            );
+            if (names.length > 0) {
+              form.validateFields(names).catch(() => {});
+            }
+          }}
         >
-          {elements.map(element => {
+          {elements.map((element) => {
             const isSelected = selectedElements.has(element.id);
             return (
-              <Card 
-                key={element.id} 
+              <Card
+                key={element.id}
                 className={`${styles.criteriaCard} ${!isSelected ? styles.unselected : ''}`}
               >
                 <div className={styles.criteriaHeader}>
-                  <Checkbox 
+                  <Checkbox
                     className={styles.criteriaCheckbox}
                     checked={isSelected}
-                    onChange={(e) => handleElementSelect(element.id, e.target.checked)}
+                    onChange={(e) =>
+                      handleElementSelect(element.id, e.target.checked)
+                    }
                   />
                   <div className={styles.criteriaNameDisplay}>
-                    <Title level={4} style={{ margin: 0 }}>{element.name}</Title>
+                    <Title level={4} style={{ margin: 0 }}>
+                      {element.name}
+                    </Title>
                   </div>
                 </div>
 
@@ -249,9 +378,12 @@ const CriteriaEditor = observer(() => {
                         <Form.Item
                           label="Weighting"
                           name={`weighting_${element.id}`}
+                          dependencies={Array.from(selectedElements).map(
+                            (id) => `weighting_${id}`
+                          )}
                           rules={[
                             { required: true, message: 'Required' },
-                            { validator: validateWeightings }
+                            { validator: validateWeightings },
                           ]}
                         >
                           <WeightingInput />
@@ -261,14 +393,29 @@ const CriteriaEditor = observer(() => {
                         <Form.Item
                           label="Maximum Mark"
                           name={`maxMark_${element.id}`}
-                          rules={[{ required: true, message: 'Required' }]}
+                          rules={[
+                            { required: true, message: 'Required' },
+                            {
+                              validator: (_, value) => {
+                                if (value === null || value === undefined || value === '') {
+                                  return Promise.resolve();
+                                }
+                                if (!Number.isInteger(value)) {
+                                  return Promise.reject(
+                                    new Error('Maximum Mark must be a whole number (integer)')
+                                  );
+                                }
+                                return Promise.resolve();
+                              },
+                            },
+                          ]}
                         >
-                          <InputNumber 
-                            min={1} 
+                          <InputNumber
+                            min={1}
                             className={styles.numberInput}
                             controls={{
                               upIcon: <PlusOutlined />,
-                              downIcon: <MinusOutlined />
+                              downIcon: <MinusOutlined />,
                             }}
                           />
                         </Form.Item>

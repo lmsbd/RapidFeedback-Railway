@@ -11,8 +11,8 @@ import {
 import { UserAddOutlined, TagsOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { history } from 'umi';
 import { observer } from 'mobx-react-lite';
-import { useStores } from '@/stores';
-import { createSubject } from '@/apis/createSubject';
+import { useStores } from '../stores';
+import { createSubject } from '../apis/createSubject';
 import styles from './createSubject.module.less';
 
 const { TextArea } = Input;
@@ -117,6 +117,39 @@ const CreateSubject = observer(() => {
       history.push('/subject');
     }
   };
+
+  const markerMap = new Map(
+    (markerStore.selectedMarkers || []).map((m) => [m?.id ?? m?.userId, m])
+  );
+  const markerRows = (markerStore.selectedMarkerIds || [])
+    .map((id) => {
+      const marker =
+        markerMap.get(id) ?? markerMap.get(Number(id)) ?? markerMap.get(String(id));
+      return {
+        userId: id,
+        role: marker?.role,
+        userName:
+          marker?.userName || marker?.name || marker?.user?.userName || `Marker ${id}`,
+        email: marker?.email,
+      };
+    })
+    .filter(Boolean);
+
+  const markerColumns = [
+    { title: 'Marker ID', dataIndex: 'userId', key: 'userId' },
+    {
+      title: 'Role',
+      dataIndex: 'role',
+      key: 'role',
+      render: (role) => (role === 1 ? 'Admin' : role === 2 ? 'Marker' : '-'),
+    },
+    { title: 'Name', dataIndex: 'userName', key: 'userName' },
+    markerRows.some((m) => Boolean(m?.email)) && {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+    },
+  ].filter(Boolean);
 
   return (
     <div>
@@ -239,7 +272,11 @@ const CreateSubject = observer(() => {
               { title: 'Surname', dataIndex: 'surname', key: 'surname' },
             ]}
             rowKey="studentId"
-            pagination={{ pageSize: 5 }}
+            pagination={{
+              defaultPageSize: 5,
+              showSizeChanger: true,
+              pageSizeOptions: ['5', '10', '20', '50'],
+            }}
           />
         </Card>
       )}
@@ -248,13 +285,17 @@ const CreateSubject = observer(() => {
       {markerStore.selectedMarkerIds.length > 0 && (
         <Card className={styles.formCard} style={{ marginTop: '20px' }}>
           <Typography.Title level={4}>
-            Selected Markers ({markerStore.selectedMarkerIds.length})
+            Selected Markers ({markerRows.length})
           </Typography.Title>
           <Table
-            dataSource={markerStore.selectedMarkerIds.map((id) => ({ id }))}
-            columns={[{ title: 'Marker ID', dataIndex: 'id', key: 'id' }]}
-            rowKey="id"
-            pagination={{ pageSize: 5 }}
+            dataSource={markerRows}
+            columns={markerColumns}
+            rowKey="userId"
+            pagination={{
+              defaultPageSize: 5,
+              showSizeChanger: true,
+              pageSizeOptions: ['5', '10', '20', '50'],
+            }}
           />
         </Card>
       )}

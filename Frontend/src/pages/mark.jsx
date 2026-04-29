@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Input,
+  InputNumber,
   Select,
   Slider,
   Space,
@@ -63,6 +64,13 @@ function normalizeMax(max) {
   return m;
 }
 
+function normalizeScoreValue(value, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  const bounded = Math.min(max, Math.max(0, numeric));
+  return Number(bounded.toFixed(1));
+}
+
 function commentTypeTag(type) {
   if (type === 2) return <Tag color="green">Positive</Tag>;
   if (type === 1) return <Tag color="gold">Neutral</Tag>;
@@ -91,9 +99,15 @@ export default function MarkPage() {
   const pageType = searchParams.get('type') || 'mark';
   const isReview = pageType === 'review';
   const rawStudentName = searchParams.get('studentName') || '';
+  const studentCode = searchParams.get('studentId') || '';
   const rawGroupName = searchParams.get('groupName') || '';
   const studentName = rawStudentName ? decodeURIComponent(rawStudentName) : '';
   const groupName = rawGroupName ? decodeURIComponent(rawGroupName) : '';
+
+  const fromGroup = searchParams.get('fromGroup') === '1';
+  const returnGroupId = searchParams.get('returnGroupId') || '';
+  const returnGroupName = searchParams.get('returnGroupName') || '';
+  const displayGroupName = groupName || returnGroupName;
 
   const isIndividual = !!individualId;
   const targetId = isIndividual ? individualId : groupId;
@@ -215,7 +229,7 @@ export default function MarkPage() {
             maxMark: a?.maxMark,
             markIncrements: a?.markIncrements,
             mark: hasScore ? numericScore : 0,
-            scored: hasScore,
+            scored: pageType === 'mark' ? true : hasScore,
             comment,
           };
         });
@@ -256,10 +270,8 @@ export default function MarkPage() {
 
     return rows.reduce((sum, r) => {
       const mark = Number(r.mark) || 0;
-      const maxMark = normalizeMax(r.maxMark);
       const weighting = Number(r.weighting) || 0;
-      const ratio = maxMark > 0 ? mark / maxMark : 0;
-      return sum + ratio * weighting;
+      return sum + (mark * weighting) / 100;
     }, 0);
   }, [rows]);
 
@@ -311,7 +323,17 @@ export default function MarkPage() {
         : await saveGroupMark(payload);
       if (res?.code === 200) {
         message.success('Saved');
-        history.push(`/markedList/${numericProjectId}`);
+        if (fromGroup && returnGroupId) {
+          const returnParams = new URLSearchParams({
+            projectId: String(numericProjectId),
+            groupId: returnGroupId,
+            groupName: returnGroupName,
+            type: pageType,
+          });
+          history.push(`/groupMark?${returnParams.toString()}`);
+        } else {
+          history.push(`/markedList/${numericProjectId}`);
+        }
       } else {
         message.error(res?.message || 'Failed to save');
       }
@@ -369,36 +391,50 @@ export default function MarkPage() {
       {
         title: 'Criteria',
         dataIndex: 'name',
+        width: 1,
+        className: styles.criteriaCol,
+        render: (name) => <span className={styles.criteriaText}>{name}</span>,
       },
       {
         title: 'Score',
         key: 'mark',
-        width: 420,
+        maxWidth:600,
+        minWidth: 150,
         render: (_, record) => {
           const max = normalizeMax(record.maxMark);
           const step = normalizeStep(record.markIncrements);
           const value = Number.isFinite(Number(record.mark))
             ? Number(record.mark)
             : 0;
+          const updateScore = (nextValue) => {
+            const normalized = normalizeScoreValue(nextValue, max);
+            setRows((prev) =>
+              prev.map((r) =>
+                r.criteriaId === record.criteriaId
+                  ? { ...r, mark: normalized, scored: true }
+                  : r
+              )
+            );
+          };
           return (
             <div className={styles.markCell}>
-              <Slider
-                min={0}
-                max={max}
-                step={step}
-                value={value}
-                onChange={(v) => {
-                  const next = Number(v);
-                  setRows((prev) =>
-                    prev.map((r) =>
-                      r.criteriaId === record.criteriaId
-                        ? { ...r, mark: next, scored: true }
-                        : r
-                    )
-                  );
-                }}
-              />
-              <Text className={styles.markValue}>{value}</Text>
+              <div className={styles.markControls}>
+                <InputNumber
+                  min={0}
+                  max={max}
+                  step={0.1}
+                  precision={1}
+                  value={value}
+                  onChange={updateScore}
+                />
+                <Slider
+                  min={0}
+                  max={max}
+                  step={step}
+                  value={value}
+                  onChange={updateScore}
+                />
+              </div>
               <Text type="secondary" className={styles.markMeta}>
                 / {max} (step {step})
               </Text>
@@ -409,7 +445,8 @@ export default function MarkPage() {
       {
         title: 'Comment',
         key: 'comment',
-        width: 560,
+        maxWidth: 560,
+        minWidth: 250,
         render: (_, record) => {
           const criteriaId = record.criteriaId;
           const loadingPreset = !!commentLoadingByCriteria[criteriaId];
@@ -431,13 +468,13 @@ export default function MarkPage() {
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
               <Select
                 placeholder="Select a preset comment"
-                style={{ width: '100%' }}
+                className={styles.commentInput}
                 options={options}
                 loading={loadingPreset}
                 allowClear
                 showSearch
                 optionFilterProp="label"
-                onDropdownVisibleChange={(open) => {
+                onOpenChange={(open) => {
                   if (open) ensureCommentsLoaded(criteriaId);
                 }}
                 onChange={(v) => {
@@ -447,7 +484,7 @@ export default function MarkPage() {
               <TextArea
                 value={record.comment}
                 placeholder="Enter comment"
-                style={{ width: '100%' }}
+                className={styles.commentInput}
                 autoSize={{ minRows: 2, maxRows: 4 }}
                 onChange={(e) => {
                   const next = e.target.value;
@@ -469,10 +506,18 @@ export default function MarkPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <BackButton text="Back" />
+        <BackButton
+          text="Back"
+          customPath={
+            fromGroup && returnGroupId
+              ? `/groupMark?projectId=${projectId}&groupId=${returnGroupId}&groupName=${encodeURIComponent(returnGroupName)}&type=${pageType}`
+              : undefined
+          }
+        />
         <div className={styles.headerMain}>
           <Title level={3} className={styles.title}>
-            {detail?.projectName ? detail.projectName : 'Mark'}
+            {detail?.projectName ? detail.projectName : 'Mark '}
+            {fromGroup && isIndividual ? ' '+displayGroupName || '-': null}
           </Title>
           <div className={styles.metaRow}>
             <Space size={12} wrap>
@@ -481,8 +526,11 @@ export default function MarkPage() {
               </Text> */}
               <Text>
                 {isIndividual ? 'Student Name' : 'Group Name'}:{' '}
-                {targetName || '-'}
+                {isIndividual
+                  ? `${targetName || '-'}${studentCode ? ` (${studentCode})` : ''}`
+                  : targetName || '-'}
               </Text>
+
             </Space>
           </div>
         </div>
@@ -520,6 +568,8 @@ export default function MarkPage() {
                 dataSource={rows}
                 columns={columns}
                 pagination={false}
+                className={styles.scoreTable}
+                scroll={{ x: 'max-content' }}
               />
             </Spin>
           </Card>
@@ -532,10 +582,10 @@ export default function MarkPage() {
           <Text className={styles.totalValue}>
             {Number.isFinite(Number(totalScore))
               ? Number(totalScore).toFixed(2)
-              : '0.00'}
+              : '--'}
           </Text>
         </div>
-        <Button type="primary" loading={saving} onClick={handleSave}>
+        <Button className={styles.saveButton} type="primary" loading={saving} onClick={handleSave}>
           Save
         </Button>
       </div>

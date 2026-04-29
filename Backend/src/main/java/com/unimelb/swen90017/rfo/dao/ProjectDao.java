@@ -1,11 +1,13 @@
 package com.unimelb.swen90017.rfo.dao;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.unimelb.swen90017.rfo.pojo.po.*;
 import com.unimelb.swen90017.rfo.pojo.vo.AssessmentVO;
 import com.unimelb.swen90017.rfo.pojo.vo.GroupResponseVO;
+import com.unimelb.swen90017.rfo.pojo.vo.MarkerScoreVO;
 import com.unimelb.swen90017.rfo.pojo.vo.StudentResponseVO;
 import com.unimelb.swen90017.rfo.pojo.vo.UserDetailVO;
 import org.apache.ibatis.annotations.*;
@@ -16,12 +18,12 @@ import org.apache.ibatis.annotations.*;
 @Mapper
 public interface ProjectDao extends BaseMapper<ProjectPO> {
 
-    @Select("SELECT p.id, p.project_name AS name, p.countdown, p.subject_id AS subjectId "
+    @Select("SELECT p.id, p.project_name AS name, p.countdown, p.subject_id AS subjectId, p.project_type AS projectType "
             + "FROM project p WHERE p.subject_id = #{subjectId} AND p.delete_status = 0")
     List<ProjectPO> getProjectsBySubjectId(@Param("subjectId") Long subjectId);
 
     @Select("""
-    SELECT p.id, p.project_name AS name, p.countdown, p.subject_id AS subjectId
+    SELECT p.id, p.project_name AS name, p.countdown, p.subject_id AS subjectId, p.project_type AS projectType
     FROM project p
     INNER JOIN user_project up ON p.id = up.project_id
     WHERE p.subject_id = #{subjectId}
@@ -31,7 +33,7 @@ public interface ProjectDao extends BaseMapper<ProjectPO> {
     List<ProjectPO> getProjectsBySubjectIdAndMarkerId(@Param("subjectId") Long subjectId,
                                                       @Param("markerId") Long markerId);
 
-    // 查询组的学生列表
+    // Query the student list for a group
     @Select("SELECT DISTINCT s.* FROM student s "
             + "INNER JOIN group_student gs ON (s.student_id = gs.student_id OR s.id = gs.student_id) "
             + "WHERE gs.group_id = #{groupId} "
@@ -50,33 +52,27 @@ public interface ProjectDao extends BaseMapper<ProjectPO> {
     INNER JOIN student s ON s.id = sp.student_id
     WHERE sp.project_id = #{projectId}
       AND s.delete_status = 0
-      AND (
-        NOT EXISTS (
-          SELECT 1
-          FROM mark_record mr
-          WHERE mr.project_id = sp.project_id
-            AND mr.student_id = s.id
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM mark_record mr
-          WHERE mr.project_id = sp.project_id
-            AND mr.student_id = s.id
-            AND mr.total_score IS NULL
-        )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM mark_record mr
+        WHERE mr.project_id = sp.project_id
+          AND mr.student_id = s.id
+          AND mr.marker_id = #{userId}
+          AND mr.total_score IS NOT NULL
       )
     ORDER BY s.id
       """)
-    List<StudentResponseVO> getUnmarkedStudentsByProjectId(@Param("projectId") Long projectId);
+    List<StudentResponseVO> getUnmarkedStudentsByProjectId(@Param("projectId") Long projectId,
+                                                           @Param("userId") Long userId);
     
     @Select("""
-    SELECT DISTINCT
+    SELECT
       s.id AS id,
       s.student_id AS studentId,
       s.email AS email,
       s.first_name AS firstName,
       s.surname AS surname,
-      mr.total_score AS totalScore
+      AVG(mr.total_score) AS totalScore
     FROM student_project sp
     INNER JOIN student s ON s.id = sp.student_id
     INNER JOIN mark_record mr
@@ -85,9 +81,18 @@ public interface ProjectDao extends BaseMapper<ProjectPO> {
     WHERE sp.project_id = #{projectId}
       AND s.delete_status = 0
       AND mr.total_score IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM mark_record mr2
+        WHERE mr2.project_id = sp.project_id
+          AND mr2.student_id = s.id
+          AND mr2.marker_id = #{userId}
+          AND mr2.total_score IS NOT NULL
+      )
+    GROUP BY s.id, s.student_id, s.email, s.first_name, s.surname
     ORDER BY s.id
       """)
-    List<StudentResponseVO> getMarkedStudentsByProjectId(@Param("projectId") Long projectId);
+    List<StudentResponseVO> getMarkedStudentsByProjectId(@Param("projectId") Long projectId,
+                                                         @Param("userId") Long userId);
 
     @Select("""
     SELECT DISTINCT
@@ -101,31 +106,170 @@ public interface ProjectDao extends BaseMapper<ProjectPO> {
         FROM group_mark_record gmr
         WHERE gmr.project_id = pg.project_id
           AND gmr.group_id = pg.id
+          AND gmr.marker_id = #{userId}
       )
     ORDER BY pg.id
     """)
-    List<GroupResponseVO> getUnmarkedGroupsByProjectId(@Param("projectId") Long projectId);
+    List<GroupResponseVO> getUnmarkedGroupsByProjectId(@Param("projectId") Long projectId,
+                                                       @Param("userId") Long userId);
 
     @Select("""
     SELECT DISTINCT
       pg.id AS id,
       pg.group_name AS name,
-      gmr.total_score AS totalScore
+      (
+        SELECT AVG(per_marker.score)
+        FROM (
+          SELECT MIN(mr.group_score) AS score
+          FROM group_student gs
+          JOIN mark_record mr ON mr.project_id = pg.project_id
+                              AND mr.student_id = gs.student_id
+          WHERE gs.group_id = pg.id
+            AND mr.group_score IS NOT NULL
+          GROUP BY mr.marker_id
+        ) AS per_marker
+      ) AS totalScore
     FROM project_group pg
     INNER JOIN group_mark_record gmr
       ON gmr.project_id = pg.project_id
       AND gmr.group_id = pg.id
+      AND gmr.marker_id = #{userId}
     WHERE pg.project_id = #{projectId}
       AND pg.delete_status = 0
     ORDER BY pg.id
     """)
-    List<GroupResponseVO> getMarkedGroupsByProjectId(@Param("projectId") Long projectId);
+    List<GroupResponseVO> getMarkedGroupsByProjectId(@Param("projectId") Long projectId,
+                                                     @Param("userId") Long userId);
+
+    // ---- Marker-filtered variants ----
+
+    @Select("""
+    SELECT DISTINCT
+      s.id AS id,
+      s.student_id AS studentId,
+      s.email AS email,
+      s.first_name AS firstName,
+      s.surname AS surname
+    FROM student_project sp
+    INNER JOIN student s ON s.id = sp.student_id
+    INNER JOIN marker_student ms
+      ON ms.project_id = sp.project_id
+      AND ms.student_id = s.id
+      AND ms.marker_id = #{markerId}
+    WHERE sp.project_id = #{projectId}
+      AND s.delete_status = 0
+      AND (
+        NOT EXISTS (
+          SELECT 1 FROM mark_record mr
+          WHERE mr.project_id = sp.project_id AND mr.student_id = s.id AND mr.marker_id = #{markerId}
+        )
+        OR EXISTS (
+          SELECT 1 FROM mark_record mr
+          WHERE mr.project_id = sp.project_id AND mr.student_id = s.id AND mr.marker_id = #{markerId} AND mr.total_score IS NULL
+        )
+      )
+    ORDER BY s.id
+    """)
+    List<StudentResponseVO> getUnmarkedStudentsByProjectIdAndMarker(@Param("projectId") Long projectId,
+                                                                     @Param("markerId") Long markerId);
+
+    @Select("""
+    SELECT
+      s.id AS id,
+      s.student_id AS studentId,
+      s.email AS email,
+      s.first_name AS firstName,
+      s.surname AS surname,
+      mr.total_score AS totalScore
+    FROM student_project sp
+    INNER JOIN student s ON s.id = sp.student_id
+    INNER JOIN mark_record mr
+      ON mr.project_id = sp.project_id
+      AND mr.student_id = s.id
+      AND mr.marker_id = #{markerId}
+    INNER JOIN marker_student ms
+      ON ms.project_id = sp.project_id
+      AND ms.student_id = s.id
+      AND ms.marker_id = #{markerId}
+    WHERE sp.project_id = #{projectId}
+      AND s.delete_status = 0
+      AND mr.total_score IS NOT NULL
+    ORDER BY s.id
+    """)
+    List<StudentResponseVO> getMarkedStudentsByProjectIdAndMarker(@Param("projectId") Long projectId,
+                                                                   @Param("markerId") Long markerId);
+
+    @Select("""
+    SELECT DISTINCT
+      pg.id AS id,
+      pg.group_name AS name
+    FROM project_group pg
+    INNER JOIN marker_group mg
+      ON mg.project_id = pg.project_id
+      AND mg.group_id = pg.id
+      AND mg.marker_id = #{markerId}
+    WHERE pg.project_id = #{projectId}
+      AND pg.delete_status = 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM mark_record mr
+        INNER JOIN group_student gs ON gs.student_id = mr.student_id
+        WHERE mr.project_id = pg.project_id
+          AND gs.group_id = pg.id
+          AND mr.marker_id = #{markerId}
+          AND mr.group_score IS NOT NULL
+          AND (gs.delete_status = 0 OR gs.delete_status IS NULL)
+      )
+    ORDER BY pg.id
+    """)
+    List<GroupResponseVO> getUnmarkedGroupsByProjectIdAndMarker(@Param("projectId") Long projectId,
+                                                                 @Param("markerId") Long markerId);
+
+    @Select("""
+    SELECT DISTINCT
+      pg.id AS id,
+      pg.group_name AS name,
+      (
+        SELECT mr.group_score
+        FROM group_student gs
+        JOIN mark_record mr ON mr.project_id = pg.project_id
+                            AND mr.student_id = gs.student_id
+                            AND mr.marker_id = #{markerId}
+        WHERE gs.group_id = pg.id
+          AND mr.group_score IS NOT NULL
+        LIMIT 1
+      ) AS totalScore
+    FROM project_group pg
+    INNER JOIN group_mark_record gmr
+      ON gmr.project_id = pg.project_id
+      AND gmr.group_id = pg.id
+      AND gmr.marker_id = #{markerId}
+    INNER JOIN marker_group mg
+      ON mg.project_id = pg.project_id
+      AND mg.group_id = pg.id
+      AND mg.marker_id = #{markerId}
+    WHERE pg.project_id = #{projectId}
+      AND pg.delete_status = 0
+    ORDER BY pg.id
+    """)
+    List<GroupResponseVO> getMarkedGroupsByProjectIdAndMarker(@Param("projectId") Long projectId,
+                                                               @Param("markerId") Long markerId);
 
     @Update("UPDATE project SET delete_status = 1 WHERE id = #{projectId}")
     void deleteProject(Long projectId);
 
     @Select("SELECT template_id FROM project WHERE id = #{projectId}")
     Long getTemplateIdByProjectId(Long projectId);
+
+    @Select("""
+    SELECT COALESCE(SUM(ac.maximum_mark * ac.weighting / 100.0), 0)
+    FROM project p
+    JOIN assessment_criteria ac ON ac.template_id = p.template_id
+    WHERE p.id = #{projectId}
+      AND p.delete_status = 0
+      AND ac.delete_status = 0
+    """)
+    BigDecimal getWeightedMaxScoreByProjectId(@Param("projectId") Long projectId);
 
     @Update("UPDATE assessment_criteria SET delete_status = 1 WHERE template_id = #{templateId}")
     void deleteAssessmentCriteria(Long templateId);
@@ -163,7 +307,7 @@ public interface ProjectDao extends BaseMapper<ProjectPO> {
     void deleteGroupStudent(Long groupId);
 
     @Select("""
-    SELECT ac.id AS criteriaId, te.name AS name, ac.weighting AS weighting, ac.maximum_mark AS maxMark, ac.mark_increments AS markIncrements
+    SELECT ac.id AS criteriaId, ac.template_element_id AS elementId, te.name AS name, ac.weighting AS weighting, ac.maximum_mark AS maxMark, ac.mark_increments AS markIncrements
     FROM assessment_criteria ac
     JOIN template_element te ON ac.template_element_id = te.id
     WHERE ac.template_id = #{templateId} AND ac.delete_status = 0 AND te.delete_status = 0
@@ -172,12 +316,31 @@ public interface ProjectDao extends BaseMapper<ProjectPO> {
     List<AssessmentVO> getAssessmentByTemplateId(@Param("templateId") Long templateId);
 
     @Select("""
-    SELECT u.id AS id, u.username AS username, u.email AS email
+    SELECT DISTINCT u.id AS id, u.username AS username, u.email AS email
     FROM user u
     INNER JOIN user_project up ON u.id = up.user_id
     WHERE up.project_id = #{projectId} AND u.role = 2 AND u.delete_status = 0
     """)
     List<UserDetailVO> getMarkersByProjectId(@Param("projectId") Long projectId);
+
+
+    @Select("""
+    SELECT u.id AS id, u.username AS username, u.email AS email
+    FROM marker_student ms
+    INNER JOIN user u ON u.id = ms.marker_id
+    WHERE ms.project_id = #{projectId} AND ms.student_id = #{studentId} AND u.delete_status = 0
+    """)
+    List<UserDetailVO> getMarkersByStudentAndProject(@Param("projectId") Long projectId,
+                                                     @Param("studentId") Long studentId);
+
+    @Select("""
+    SELECT u.id AS id, u.username AS username, u.email AS email
+    FROM marker_group mg
+    INNER JOIN user u ON u.id = mg.marker_id
+    WHERE mg.project_id = #{projectId} AND mg.group_id = #{groupId} AND u.delete_status = 0
+    """)
+    List<UserDetailVO> getMarkersByGroupAndProject(@Param("projectId") Long projectId,
+                                                   @Param("groupId") Long groupId);
 
     @Select("""
     SELECT s.id AS id, s.student_id AS studentId, s.email AS email, s.first_name AS firstName, s.surname AS surname
@@ -200,4 +363,274 @@ public interface ProjectDao extends BaseMapper<ProjectPO> {
     void insertUserProject(@Param("userId") Long userId,
                            @Param("subjectId") Long subjectId,
                            @Param("projectId") Long projectId);
+
+    @Insert("INSERT INTO marker_student (project_id, student_id, marker_id) VALUES (#{projectId}, #{studentId}, #{markerId})")
+    void insertMarkerStudent(@Param("projectId") Long projectId,
+                             @Param("studentId") Long studentId,
+                             @Param("markerId") Long markerId);
+
+    @Insert("INSERT INTO marker_group (project_id, group_id, marker_id) VALUES (#{projectId}, #{groupId}, #{markerId})")
+    void insertMarkerGroup(@Param("projectId") Long projectId,
+                           @Param("groupId") Long groupId,
+                           @Param("markerId") Long markerId);
+
+    @Delete("DELETE FROM marker_student WHERE project_id = #{projectId}")
+    void deleteMarkerStudent(@Param("projectId") Long projectId);
+
+    @Delete("DELETE FROM marker_group WHERE project_id = #{projectId}")
+    void deleteMarkerGroup(@Param("projectId") Long projectId);
+
+    @Delete("DELETE FROM mark_detail WHERE mark_record_id IN (SELECT id FROM mark_record WHERE project_id = #{projectId})")
+    void deleteMarkDetailByProjectId(@Param("projectId") Long projectId);
+
+    @Delete("DELETE FROM mark_record WHERE project_id = #{projectId}")
+    void deleteMarkRecordByProjectId(@Param("projectId") Long projectId);
+
+    @Delete("DELETE FROM group_mark_record WHERE project_id = #{projectId}")
+    void deleteGroupMarkRecordByProjectId(@Param("projectId") Long projectId);
+
+    @Select("SELECT COUNT(*) FROM mark_record WHERE project_id = #{projectId}")
+    int countMarkRecordsByProjectId(@Param("projectId") Long projectId);
+
+    @Update("UPDATE project SET project_name = #{name} WHERE id = #{id}")
+    void updateProjectName(@Param("id") Long id, @Param("name") String name);
+
+    @Update("UPDATE project SET project_name = #{name}, countdown = #{countdown} WHERE id = #{id}")
+    void updateProjectNameAndCountdown(@Param("id") Long id, @Param("name") String name, @Param("countdown") Long countdown);
+
+    @Select("""
+    SELECT am.marker_id AS markerId,
+           u.username AS markerName,
+           MAX(mr.total_score) AS score
+    FROM (
+        SELECT marker_id FROM marker_student
+        WHERE project_id = #{projectId} AND student_id = #{studentId}
+        UNION
+        SELECT marker_id FROM mark_record
+        WHERE project_id = #{projectId} AND student_id = #{studentId}
+    ) am
+    INNER JOIN user u ON u.id = am.marker_id
+    LEFT JOIN mark_record mr ON mr.project_id = #{projectId}
+                             AND mr.marker_id = am.marker_id
+                             AND mr.student_id = #{studentId}
+                             AND mr.total_score IS NOT NULL
+    GROUP BY am.marker_id, u.username
+    ORDER BY am.marker_id
+    """)
+    List<MarkerScoreVO> getMarkerScoresByProjectAndStudent(@Param("projectId") Long projectId,
+                                                           @Param("studentId") Long studentId);
+
+    @Select("""
+    SELECT am.marker_id AS markerId,
+           u.username AS markerName,
+           CASE
+             WHEN gmr.marker_id IS NULL THEN NULL
+             WHEN COUNT(DISTINCT gs.student_id) = 0 THEN NULL
+             WHEN COUNT(DISTINCT CASE WHEN mr.group_score IS NOT NULL THEN gs.student_id END) < COUNT(DISTINCT gs.student_id)
+               THEN NULL
+             ELSE MIN(mr.group_score)
+           END AS score
+    FROM (
+        SELECT marker_id FROM marker_group
+        WHERE project_id = #{projectId} AND group_id = #{groupId}
+        UNION
+        SELECT marker_id FROM group_mark_record
+        WHERE project_id = #{projectId} AND group_id = #{groupId}
+    ) am
+    INNER JOIN user u ON u.id = am.marker_id
+    LEFT JOIN group_mark_record gmr ON gmr.project_id = #{projectId}
+                                   AND gmr.group_id = #{groupId}
+                                   AND gmr.marker_id = am.marker_id
+    LEFT JOIN group_student gs ON gs.group_id = #{groupId}
+                              AND (gs.delete_status = 0 OR gs.delete_status IS NULL)
+    LEFT JOIN mark_record mr ON mr.project_id = #{projectId}
+                             AND mr.marker_id = am.marker_id
+                             AND mr.student_id = gs.student_id
+    GROUP BY am.marker_id, u.username, gmr.marker_id
+    ORDER BY am.marker_id
+    """)
+    List<MarkerScoreVO> getMarkerScoresByProjectAndGroup(@Param("projectId") Long projectId,
+                                                          @Param("groupId") Long groupId);
+
+    @Select("""
+    SELECT am.marker_id AS markerId,
+           u.username AS markerName,
+           MAX(mr.group_score) AS score
+    FROM (
+        SELECT marker_id FROM marker_group
+        WHERE project_id = #{projectId} AND group_id = #{groupId}
+        UNION
+        SELECT marker_id FROM group_mark_record
+        WHERE project_id = #{projectId} AND group_id = #{groupId}
+        UNION
+        SELECT marker_id FROM mark_record
+        WHERE project_id = #{projectId} AND student_id = #{studentId}
+    ) am
+    INNER JOIN user u ON u.id = am.marker_id
+    LEFT JOIN mark_record mr ON mr.project_id = #{projectId}
+                             AND mr.marker_id = am.marker_id
+                             AND mr.student_id = #{studentId}
+                             AND mr.group_score IS NOT NULL
+    GROUP BY am.marker_id, u.username
+    ORDER BY am.marker_id
+    """)
+    List<MarkerScoreVO> getMarkerScoresByProjectAndGroupStudent(@Param("projectId") Long projectId,
+                                                                @Param("groupId") Long groupId,
+                                                                @Param("studentId") Long studentId);
+
+    // ---- Marked / Unmarked count queries (used by getProjects to expose progress) ----
+    // Each of the 8 queries below mirrors the WHERE/EXISTS clause of its list-returning
+    // counterpart above; only the SELECT projection is changed to COUNT(DISTINCT ...).
+    // Keep these in sync with the list queries so /getProjects counts match the lists.
+
+    @Select("""
+    SELECT COUNT(DISTINCT s.id)
+    FROM student_project sp
+    INNER JOIN student s ON s.id = sp.student_id
+    WHERE sp.project_id = #{projectId}
+      AND s.delete_status = 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM mark_record mr
+        WHERE mr.project_id = sp.project_id
+          AND mr.student_id = s.id
+          AND mr.marker_id = #{userId}
+          AND mr.total_score IS NOT NULL
+      )
+    """)
+    int countUnmarkedStudentsByProjectId(@Param("projectId") Long projectId,
+                                         @Param("userId") Long userId);
+
+    @Select("""
+    SELECT COUNT(DISTINCT s.id)
+    FROM student_project sp
+    INNER JOIN student s ON s.id = sp.student_id
+    INNER JOIN mark_record mr
+      ON mr.project_id = sp.project_id
+      AND mr.student_id = s.id
+    WHERE sp.project_id = #{projectId}
+      AND s.delete_status = 0
+      AND mr.total_score IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM mark_record mr2
+        WHERE mr2.project_id = sp.project_id
+          AND mr2.student_id = s.id
+          AND mr2.marker_id = #{userId}
+          AND mr2.total_score IS NOT NULL
+      )
+    """)
+    int countMarkedStudentsByProjectId(@Param("projectId") Long projectId,
+                                       @Param("userId") Long userId);
+
+    @Select("""
+    SELECT COUNT(DISTINCT s.id)
+    FROM student_project sp
+    INNER JOIN student s ON s.id = sp.student_id
+    INNER JOIN marker_student ms
+      ON ms.project_id = sp.project_id
+      AND ms.student_id = s.id
+      AND ms.marker_id = #{markerId}
+    WHERE sp.project_id = #{projectId}
+      AND s.delete_status = 0
+      AND (
+        NOT EXISTS (
+          SELECT 1 FROM mark_record mr
+          WHERE mr.project_id = sp.project_id AND mr.student_id = s.id AND mr.marker_id = #{markerId}
+        )
+        OR EXISTS (
+          SELECT 1 FROM mark_record mr
+          WHERE mr.project_id = sp.project_id AND mr.student_id = s.id AND mr.marker_id = #{markerId} AND mr.total_score IS NULL
+        )
+      )
+    """)
+    int countUnmarkedStudentsByProjectIdAndMarker(@Param("projectId") Long projectId,
+                                                  @Param("markerId") Long markerId);
+
+    @Select("""
+    SELECT COUNT(DISTINCT s.id)
+    FROM student_project sp
+    INNER JOIN student s ON s.id = sp.student_id
+    INNER JOIN mark_record mr
+      ON mr.project_id = sp.project_id
+      AND mr.student_id = s.id
+      AND mr.marker_id = #{markerId}
+    INNER JOIN marker_student ms
+      ON ms.project_id = sp.project_id
+      AND ms.student_id = s.id
+      AND ms.marker_id = #{markerId}
+    WHERE sp.project_id = #{projectId}
+      AND s.delete_status = 0
+      AND mr.total_score IS NOT NULL
+    """)
+    int countMarkedStudentsByProjectIdAndMarker(@Param("projectId") Long projectId,
+                                                @Param("markerId") Long markerId);
+
+    @Select("""
+    SELECT COUNT(DISTINCT pg.id)
+    FROM project_group pg
+    WHERE pg.project_id = #{projectId}
+      AND pg.delete_status = 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM group_mark_record gmr
+        WHERE gmr.project_id = pg.project_id
+          AND gmr.group_id = pg.id
+          AND gmr.marker_id = #{userId}
+      )
+    """)
+    int countUnmarkedGroupsByProjectId(@Param("projectId") Long projectId,
+                                       @Param("userId") Long userId);
+
+    @Select("""
+    SELECT COUNT(DISTINCT pg.id)
+    FROM project_group pg
+    INNER JOIN group_mark_record gmr
+      ON gmr.project_id = pg.project_id
+      AND gmr.group_id = pg.id
+      AND gmr.marker_id = #{userId}
+    WHERE pg.project_id = #{projectId}
+      AND pg.delete_status = 0
+    """)
+    int countMarkedGroupsByProjectId(@Param("projectId") Long projectId,
+                                     @Param("userId") Long userId);
+
+    @Select("""
+    SELECT COUNT(DISTINCT pg.id)
+    FROM project_group pg
+    INNER JOIN marker_group mg
+      ON mg.project_id = pg.project_id
+      AND mg.group_id = pg.id
+      AND mg.marker_id = #{markerId}
+    WHERE pg.project_id = #{projectId}
+      AND pg.delete_status = 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM mark_record mr
+        INNER JOIN group_student gs ON gs.student_id = mr.student_id
+        WHERE mr.project_id = pg.project_id
+          AND gs.group_id = pg.id
+          AND mr.marker_id = #{markerId}
+          AND mr.group_score IS NOT NULL
+          AND (gs.delete_status = 0 OR gs.delete_status IS NULL)
+      )
+    """)
+    int countUnmarkedGroupsByProjectIdAndMarker(@Param("projectId") Long projectId,
+                                                @Param("markerId") Long markerId);
+
+    @Select("""
+    SELECT COUNT(DISTINCT pg.id)
+    FROM project_group pg
+    INNER JOIN group_mark_record gmr
+      ON gmr.project_id = pg.project_id
+      AND gmr.group_id = pg.id
+      AND gmr.marker_id = #{markerId}
+    INNER JOIN marker_group mg
+      ON mg.project_id = pg.project_id
+      AND mg.group_id = pg.id
+      AND mg.marker_id = #{markerId}
+    WHERE pg.project_id = #{projectId}
+      AND pg.delete_status = 0
+    """)
+    int countMarkedGroupsByProjectIdAndMarker(@Param("projectId") Long projectId,
+                                              @Param("markerId") Long markerId);
 }
