@@ -1,11 +1,15 @@
 import axios from 'axios';
 import userStore from '@/stores/userStore';
 
+const API_BASE_URL =
+  process.env.NODE_ENV === 'development'
+    ? '/api'
+    : process.env.UMI_APP_API_BASE_URL;
+
 const request = axios.create({
-  //   baseURL: process.env.NODE_ENV === 'development'
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   timeout: 10000,
-  withCredentials: false, // cookie
+  withCredentials: false,
 });
 
 request.interceptors.request.use(
@@ -15,7 +19,6 @@ request.interceptors.request.use(
       'Content-Type': 'application/json',
     };
 
-    // If user is logged in, add JWT token to request headers
     if (userStore.token) {
       config.headers.Authorization = `Bearer ${userStore.token}`;
     }
@@ -32,10 +35,8 @@ request.interceptors.response.use(
     return response.data;
   },
   (error) => {
-    // If 401 unauthorized, clear login status
     if (error.response && error.response.status === 401) {
       userStore.logout();
-      // Can add redirect to login page logic here
       window.location.reload();
     }
     return Promise.reject(error);
