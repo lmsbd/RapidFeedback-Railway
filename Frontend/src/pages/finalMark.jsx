@@ -10,6 +10,8 @@ import {
   message,
   Tooltip,
   Popconfirm,
+  Upload,
+  Modal,
 } from 'antd';
 import {
   LockOutlined,
@@ -17,9 +19,18 @@ import {
   SaveOutlined,
   CheckCircleOutlined,
   SendOutlined,
+  DownloadOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import BackButton from '../components/BackButton/BackButton';
-import { getFinalMarkList, saveFinalMark, lockFinalMark, publishReport } from '../apis/finalMark';
+import {
+  getFinalMarkList,
+  saveFinalMark,
+  lockFinalMark,
+  publishReport,
+  exportRawFinalMarkExcel,
+  importMarkExcel,
+} from '../apis/finalMark';
 import { getProjectDetail } from '../apis/getProjectDetail';
 import styles from './finalMark.module.less';
 
@@ -80,7 +91,9 @@ export default function FinalMark() {
   const [subjectName, setSubjectName] = useState(routeSubjectName || '');
   const [editedScores, setEditedScores] = useState({});
   const [publishing, setPublishing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [maxFinalMark, setMaxFinalMark] = useState(100);
   const [tablePagination, setTablePagination] = useState({
     current: 1,
@@ -88,7 +101,8 @@ export default function FinalMark() {
   });
 
   const isGroupProject = projectType === 'group';
-  const allConfirmed = items.length > 0 && items.every((item) => !!item.isLocked);
+  const allConfirmed =
+    items.length > 0 && items.every((item) => !!item.isLocked);
 
   const hasUnsavedEdits = useMemo(
     () => Object.keys(editedScores).some((k) => editedScores[k] !== undefined),
@@ -185,12 +199,9 @@ export default function FinalMark() {
     [isGroupProject]
   );
 
-  const getEditKey = useCallback(
-    (record) => {
-      return `s-${record.studentId ?? record.id}`;
-    },
-    []
-  );
+  const getEditKey = useCallback((record) => {
+    return `s-${record.studentId ?? record.id}`;
+  }, []);
 
   const handleScoreChange = useCallback(
     (record, value) => {
@@ -219,14 +230,18 @@ export default function FinalMark() {
     async (record) => {
       const key = getEditKey(record);
       const score = getCurrentScore(record);
-      const groupId = isGroupProject ? Number(record.groupId ?? record.id) : null;
+      const groupId = isGroupProject
+        ? Number(record.groupId ?? record.id)
+        : null;
 
       if (score == null) {
         message.warning('Please enter a final mark before saving');
         return false;
       }
       if (score < 0 || score > maxFinalMark) {
-        message.warning(`Final mark must be between 0 and ${maxFinalMark.toFixed(2)}`);
+        message.warning(
+          `Final mark must be between 0 and ${maxFinalMark.toFixed(2)}`
+        );
         return false;
       }
 
@@ -254,7 +269,14 @@ export default function FinalMark() {
         setSaving((prev) => ({ ...prev, [key]: false }));
       }
     },
-    [projectId, isGroupProject, getEditKey, getCurrentScore, fetchData, maxFinalMark]
+    [
+      projectId,
+      isGroupProject,
+      getEditKey,
+      getCurrentScore,
+      fetchData,
+      maxFinalMark,
+    ]
   );
 
   const handleConfirmWithSave = useCallback(
@@ -271,18 +293,24 @@ export default function FinalMark() {
       const key = getEditKey(record);
       setLocking((prev) => ({ ...prev, [key]: true }));
       try {
-        const groupId = isGroupProject ? Number(record.groupId ?? record.id) : null;
+        const groupId = isGroupProject
+          ? Number(record.groupId ?? record.id)
+          : null;
         await lockFinalMark({
           projectId: Number(projectId),
           studentId: record.studentId ?? record.id,
           groupId,
           isLocked: lock ? 1 : 0,
         });
-        message.success(lock ? 'Final mark confirmed' : 'Final mark unconfirmed');
+        message.success(
+          lock ? 'Final mark confirmed' : 'Final mark unconfirmed'
+        );
         await fetchData();
       } catch (e) {
         console.error(e);
-        message.error(e?.response?.data?.msg || 'Failed to update confirmation status');
+        message.error(
+          e?.response?.data?.msg || 'Failed to update confirmation status'
+        );
       } finally {
         setLocking((prev) => ({ ...prev, [key]: false }));
       }
@@ -310,11 +338,15 @@ export default function FinalMark() {
           const score = getCurrentScore(record);
           if (score == null) continue;
           if (score < 0 || score > maxFinalMark) {
-            message.warning(`Final mark must be between 0 and ${maxFinalMark.toFixed(2)}`);
+            message.warning(
+              `Final mark must be between 0 and ${maxFinalMark.toFixed(2)}`
+            );
             return false;
           }
 
-          const groupId = isGroupProject ? Number(record.groupId ?? record.id) : null;
+          const groupId = isGroupProject
+            ? Number(record.groupId ?? record.id)
+            : null;
           await saveFinalMark({
             projectId: Number(projectId),
             studentId: record.studentId ?? record.id,
@@ -334,7 +366,9 @@ export default function FinalMark() {
         return true;
       } catch (e) {
         console.error(e);
-        message.error('Failed to save all final marks, some may have been saved');
+        message.error(
+          'Failed to save all final marks, some may have been saved'
+        );
         if (refreshAfterSave) {
           await fetchData();
         }
@@ -347,21 +381,28 @@ export default function FinalMark() {
   );
 
   const handleLockAll = useCallback(async () => {
-    const unlocked = items.filter((item) => !item.isLocked && getCurrentScore(item) != null);
+    const unlocked = items.filter(
+      (item) => !item.isLocked && getCurrentScore(item) != null
+    );
 
     if (!unlocked.length) {
       message.info('No unlocked items with final marks to lock');
       return;
     }
 
-    const saved = await handleSaveAll(unlocked, { showSuccess: false, refreshAfterSave: false });
+    const saved = await handleSaveAll(unlocked, {
+      showSuccess: false,
+      refreshAfterSave: false,
+    });
     if (!saved) return;
 
     setLoading(true);
     try {
       let successCount = 0;
       for (const record of unlocked) {
-        const groupId = isGroupProject ? Number(record.groupId ?? record.id) : null;
+        const groupId = isGroupProject
+          ? Number(record.groupId ?? record.id)
+          : null;
         await lockFinalMark({
           projectId: Number(projectId),
           studentId: record.studentId ?? record.id,
@@ -375,12 +416,57 @@ export default function FinalMark() {
       await fetchData();
     } catch (e) {
       console.error(e);
-      message.error('Failed to confirm all marks, some may have been confirmed');
+      message.error(
+        'Failed to confirm all marks, some may have been confirmed'
+      );
       await fetchData();
     } finally {
       setLoading(false);
     }
-  }, [items, getCurrentScore, handleSaveAll, isGroupProject, projectId, fetchData]);
+  }, [
+    items,
+    getCurrentScore,
+    handleSaveAll,
+    isGroupProject,
+    projectId,
+    fetchData,
+  ]);
+
+  const handleUnlockAll = useCallback(async () => {
+    const locked = items.filter((item) => !!item.isLocked);
+
+    if (!locked.length) {
+      message.info('No confirmed items to unconfirm');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let successCount = 0;
+      for (const record of locked) {
+        const groupId = isGroupProject
+          ? Number(record.groupId ?? record.id)
+          : null;
+        await lockFinalMark({
+          projectId: Number(projectId),
+          studentId: record.studentId ?? record.id,
+          groupId,
+          isLocked: 0,
+        });
+        successCount++;
+      }
+      message.success(`Unconfirmed ${successCount} final marks`);
+      await fetchData();
+    } catch (e) {
+      console.error(e);
+      message.error(
+        'Failed to unconfirm all marks, some may have been unconfirmed'
+      );
+      await fetchData();
+    } finally {
+      setLoading(false);
+    }
+  }, [items, isGroupProject, projectId, fetchData]);
 
   const handlePublish = useCallback(async () => {
     if (hasUnsavedEdits) {
@@ -389,7 +475,9 @@ export default function FinalMark() {
     }
     const notConfirmed = items.filter((item) => !item.isLocked);
     if (notConfirmed.length > 0) {
-      message.warning('All final marks must be admin confirmed before publishing');
+      message.warning(
+        'All final marks must be admin confirmed before publishing'
+      );
       return;
     }
     const missingFinalScores = items.filter((item) => item.finalScore == null);
@@ -407,14 +495,102 @@ export default function FinalMark() {
       console.error(e);
       message.error(
         e?.response?.data?.msg ||
-        e?.response?.data?.message ||
-        e?.message ||
-        'Failed to send reports'
+          e?.response?.data?.message ||
+          e?.message ||
+          'Failed to send reports'
       );
     } finally {
       setPublishing(false);
     }
   }, [projectId, hasUnsavedEdits, items]);
+
+  const handleExportRawData = useCallback(async () => {
+    setExporting(true);
+    try {
+      const blobData = await exportRawFinalMarkExcel(projectId, projectType);
+      const blob =
+        blobData instanceof Blob
+          ? blobData
+          : new Blob([blobData], {
+              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            });
+      const link = document.createElement('a');
+      const objectUrl = URL.createObjectURL(blob);
+      const typeSuffix = projectType === 'group' ? 'group' : 'individual';
+      link.href = objectUrl;
+      link.download = `project_${Number(projectId)}_${typeSuffix}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+      message.success('Raw data exported successfully');
+    } catch (e) {
+      console.error(e);
+      message.error(
+        e?.response?.data?.msg || e?.message || 'Failed to export raw data'
+      );
+    } finally {
+      setExporting(false);
+    }
+  }, [projectId, projectType]);
+
+  const handleImport = useCallback(
+    async (file) => {
+      const isXlsx = file.name?.endsWith('.xlsx');
+      if (!isXlsx) {
+        message.error('Please upload a valid .xlsx file');
+        return Upload.LIST_IGNORE;
+      }
+
+      setImporting(true);
+      try {
+        const res = await importMarkExcel(projectId, projectType, file);
+        const data = res?.data ?? res;
+        const {
+          totalRows = 0,
+          successRows = 0,
+          failedRows = 0,
+          failures = [],
+        } = data || {};
+
+        if (failedRows > 0) {
+          Modal.warning({
+            title: 'Import Completed with Warnings',
+            width: 520,
+            content: (
+              <div>
+                <p>
+                  Total rows: {totalRows}, Success: {successRows}, Failed:{' '}
+                  {failedRows}
+                </p>
+                <div style={{ maxHeight: 200, overflow: 'auto' }}>
+                  {failures.map((f, i) => (
+                    <p key={i} style={{ margin: '4px 0', color: '#cf1322' }}>
+                      Row {f.row}: {f.reason}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ),
+          });
+        } else {
+          message.success(
+            `Import successful: ${successRows} of ${totalRows} rows imported`
+          );
+        }
+        await fetchData();
+      } catch (e) {
+        console.error(e);
+        message.error(
+          e?.response?.data?.msg || e?.message || 'Failed to import mark data'
+        );
+      } finally {
+        setImporting(false);
+      }
+      return Upload.LIST_IGNORE;
+    },
+    [projectId, projectType, fetchData]
+  );
 
   const columns = useMemo(() => {
     const cols = [];
@@ -474,9 +650,7 @@ export default function FinalMark() {
         width: 110,
         align: 'center',
         render: (_, record) => {
-          const ms = (record.markerScores || []).find(
-            (s) => s.markerId === id
-          );
+          const ms = (record.markerScores || []).find((s) => s.markerId === id);
           if (!ms) {
             return <Tag color="default">Unassigned</Tag>;
           }
@@ -500,33 +674,6 @@ export default function FinalMark() {
         if (!scores.length) return '--';
         const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
         return <span className={styles.averageScore}>{avg.toFixed(2)}</span>;
-      },
-    });
-
-    cols.push({
-      title: 'Final Mark',
-      key: 'finalMark',
-      width: 190,
-      align: 'center',
-      render: (_, record) => {
-        const locked = !!record.isLocked;
-        const currentVal = getCurrentScore(record);
-        return (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <InputNumber
-              min={0}
-              max={maxFinalMark}
-              step={0.25}
-              precision={2}
-              value={currentVal}
-              disabled={locked}
-              onChange={(val) => handleScoreChange(record, val)}
-              style={{ width: 92 }}
-              size="small"
-            />
-            <Text type="secondary">/ {maxFinalMark.toFixed(2)}</Text>
-          </div>
-        );
       },
     });
 
@@ -557,6 +704,34 @@ export default function FinalMark() {
         }
 
         return <Tag color="default">Not Marked</Tag>;
+      },
+    });
+
+    cols.push({
+      title: 'Final Mark',
+      key: 'finalMark',
+      width: 190,
+      align: 'center',
+      fixed: 'right',
+      render: (_, record) => {
+        const locked = !!record.isLocked;
+        const currentVal = getCurrentScore(record);
+        return (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <InputNumber
+              min={0}
+              max={maxFinalMark}
+              step={0.25}
+              precision={2}
+              value={currentVal}
+              disabled={locked}
+              onChange={(val) => handleScoreChange(record, val)}
+              style={{ width: 92 }}
+              size="small"
+            />
+            <Text type="secondary">/ {maxFinalMark.toFixed(2)}</Text>
+          </div>
+        );
       },
     });
 
@@ -612,7 +787,9 @@ export default function FinalMark() {
                   size="small"
                   icon={<CheckCircleOutlined />}
                   loading={isLocking}
-                  disabled={record.finalScore == null && getCurrentScore(record) == null}
+                  disabled={
+                    record.finalScore == null && getCurrentScore(record) == null
+                  }
                   onClick={() => handleConfirmWithSave(record)}
                   className={`${styles.actionButton} ${styles.lockBtn}`}
                 >
@@ -640,18 +817,43 @@ export default function FinalMark() {
     maxFinalMark,
   ]);
 
-  const pageTitle = subjectName && projectName
-    ? `${subjectName} - ${projectName} - Final Mark`
-    : `${projectName} - Final Mark`;
+  const pageTitle =
+    subjectName && projectName
+      ? `${subjectName} - ${projectName} - Final Mark`
+      : `${projectName} - Final Mark`;
 
   return (
     <div className={styles.detailsPage}>
       <div className={styles.header}>
-        <BackButton />
-        <Title level={2} className={styles.pageTitle}>
-          {pageTitle}
-        </Title>
+        <div className={styles.headerRow}>
+          <BackButton />
+          <Title level={2} className={styles.pageTitle}>
+            {pageTitle}
+          </Title>
+        </div>
         <div className={styles.headerActions}>
+          <Button
+            icon={<DownloadOutlined />}
+            className={styles.lockAllButton}
+            loading={exporting}
+            onClick={handleExportRawData}
+          >
+            Export Raw Data
+          </Button>
+          <Upload
+            accept=".xlsx"
+            showUploadList={false}
+            beforeUpload={handleImport}
+            maxCount={1}
+          >
+            <Button
+              icon={<UploadOutlined />}
+              className={styles.lockAllButton}
+              loading={importing}
+            >
+              Import Marks
+            </Button>
+          </Upload>
           <Button
             icon={<SaveOutlined />}
             className={styles.lockAllButton}
@@ -673,6 +875,21 @@ export default function FinalMark() {
               loading={loading}
             >
               Confirm All
+            </Button>
+          </Popconfirm>
+          <Popconfirm
+            title="Unconfirm all final marks?"
+            description="This will unconfirm all currently confirmed final marks."
+            onConfirm={handleUnlockAll}
+            okText="Unconfirm All"
+            cancelText="Cancel"
+          >
+            <Button
+              icon={<UnlockOutlined />}
+              className={styles.lockAllButton}
+              loading={loading}
+            >
+              Unconfirm All
             </Button>
           </Popconfirm>
           <Tooltip
@@ -713,7 +930,7 @@ export default function FinalMark() {
               {isGroupProject ? 'Group Final Marks' : 'Student Final Marks'}
             </Text>
           }
-          variant={"outlined"}
+          variant={'outlined'}
         >
           <Table
             rowKey={getRowKey}

@@ -258,7 +258,6 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectDao, SubjectPO> imple
         if (dbUserIds == null) {
             dbUserIds = new ArrayList<>();
         }
-
         List<Long> dbMarkerIds = new ArrayList<>();
         for (Long dbUserId : dbUserIds) {
             UserPO user = userDao.selectById(dbUserId);
@@ -270,7 +269,6 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectDao, SubjectPO> imple
         // 6. Compute markers to add/remove
         List<Long> addMarkerIds = new ArrayList<>(requestMarkerIds);
         addMarkerIds.removeAll(dbMarkerIds);
-
         List<Long> removeMarkerIds = new ArrayList<>(dbMarkerIds);
         removeMarkerIds.removeAll(requestMarkerIds);
 

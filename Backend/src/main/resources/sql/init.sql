@@ -20,16 +20,6 @@ CREATE TABLE IF NOT EXISTS user
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='User table';
 
--- Insert initial users
--- Default passwords: admin=admin123, marker1-5=marker123
-INSERT IGNORE INTO user (username, password, email, role)
-VALUES ('admin', '$2a$10$aET9KZ4RTEmAxYIt41PIguYSYGN80610oTUof/mISIXt38VLEgkya', 'admin@example.com', 1),
-       ('marker1', '$2a$10$CbHYLHnou0.pJDawc.lqOO.30swJ3F3UUI48X9YWHwt7lba3KIgcG', 'marker1@example.com', 2),
-       ('marker2', '$2a$10$WPnlJxpT7UWUc5aAgOJiKuFxmgpINO44V0GcVB4/BVXqrFVXXXjue', 'marker2@example.com', 2),
-       ('marker3', '$2a$10$WPnlJxpT7UWUc5aAgOJiKuFxmgpINO44V0GcVB4/BVXqrFVXXXjue', 'marker3@example.com', 2),
-       ('marker4', '$2a$10$WPnlJxpT7UWUc5aAgOJiKuFxmgpINO44V0GcVB4/BVXqrFVXXXjue', 'marker4@example.com', 2),
-       ('marker5', '$2a$10$WPnlJxpT7UWUc5aAgOJiKuFxmgpINO44V0GcVB4/BVXqrFVXXXjue', 'marker5@example.com', 2);
-
 -- ============================================
 -- Student table
 -- ============================================
@@ -45,19 +35,6 @@ CREATE TABLE IF NOT EXISTS student
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='Student table';
 
--- Insert test data for student
-INSERT IGNORE INTO student (student_id, email, first_name, surname)
-VALUES (1510000, 'alice.chen@student.unimelb.edu.au', 'Alice', 'Chen'),
-       (1510001, 'bob.smith@student.unimelb.edu.au', 'Bob', 'Smith'),
-       (1510002, 'charlie.wang@student.unimelb.edu.au', 'Charlie', 'Wang'),
-       (1510003, 'diana.lee@student.unimelb.edu.au', 'Diana', 'Lee'),
-       (1510004, 'emma.brown@student.unimelb.edu.au', 'Emma', 'Brown'),
-       (1510005, 'frank.zhang@student.unimelb.edu.au', 'Frank', 'Zhang'),
-       (1510006, 'grace.wilson@student.unimelb.edu.au', 'Grace', 'Wilson'),
-       (1510007, 'henry.liu@student.unimelb.edu.au', 'Henry', 'Liu'),
-       (1510008, 'iris.johnson@student.unimelb.edu.au', 'Iris', 'Johnson'),
-       (1510009, 'jack.yang@student.unimelb.edu.au', 'Jack', 'Yang');
-
 -- ============================================
 -- Subject table
 -- ============================================
@@ -71,14 +48,6 @@ CREATE TABLE IF NOT EXISTS subject
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='Subject table';
 
--- Insert test data
-INSERT IGNORE INTO subject (name, description)
-VALUES ('Mathematics', 'Advanced mathematics and calculus'),
-       ('Physics', 'Classical and modern physics'),
-       ('Chemistry', 'Organic and inorganic chemistry'),
-       ('Biology', 'Cell biology and genetics'),
-       ('Computer Science', 'Programming and algorithms');
-
 -- ============================================
 -- Template table
 -- ============================================
@@ -91,12 +60,6 @@ CREATE TABLE IF NOT EXISTS template
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='template table';
-
--- Insert test data for template
-INSERT IGNORE INTO template (template_name, creator_id)
-VALUES ('Presentation Assessment Template', 1),
-       ('Lab Report Template', 1),
-       ('Project Proposal Template', 2);
 
 -- ============================================
 -- Template element table
@@ -200,29 +163,6 @@ CREATE TABLE IF NOT EXISTS assessment_criteria
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='Assessment criteria table';
 
--- Insert test data for assessment criteria
--- Template 1: Presentation Assessment Template - complete configuration
-INSERT IGNORE INTO assessment_criteria (template_id, template_element_id, template_element_name, weighting, maximum_mark, mark_increments)
-VALUES
--- Template 1: Presentation Assessment Template
-    (1, 1, 'Voice, Pace and Confidence',   15, 100, 0.5),
-    (1, 2, 'Presentation Structure',        15, 100, 0.5),
-    (1, 3, 'Quality of Slides/Visual Aids', 15, 100, 0.5),
-    (1, 4, 'Knowledge of the Material',     20, 100, 0.5),
-    (1, 5, 'Content',                        20, 100, 0.5),
-    (1, 6, 'Concluding Remarks',            10, 100, 0.5),
-    (1, 7, 'Other Comments',                 5, 100, 0.5),
--- Template 2: Lab Report Template
-    (2, 2, 'Presentation Structure',    25, 100, 1.0),
-    (2, 4, 'Knowledge of the Material', 30, 100, 1.0),
-    (2, 5, 'Content',                   35, 100, 1.0),
-    (2, 7, 'Other Comments',            10, 100, 1.0),
--- Template 3: Project Proposal Template
-    (3, 2, 'Presentation Structure',    25, 100, 1.0),
-    (3, 4, 'Knowledge of the Material', 30, 100, 1.0),
-    (3, 5, 'Content',                   35, 100, 1.0),
-    (3, 6, 'Concluding Remarks',        10, 100, 1.0);
-
 -- ============================================
 -- Project table
 -- ============================================
@@ -239,19 +179,6 @@ CREATE TABLE IF NOT EXISTS project
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='Project table';
 
--- Insert test data for project
-INSERT IGNORE INTO project (project_name, countdown, subject_id, template_id)
-VALUES ('Calculus Project', 1200000, 1, 1),
-       ('Linear Algebra Presentation', 1500000, 1, 1),
-       ('Physics Lab Experiment', 900000, 2, 2),
-       ('Quantum Mechanics Study', 1200000, 2, 1),
-       ('Chemistry Research', 1500000, 3, 3),
-       ('Organic Chemistry Synthesis', 1800000, 3, 2),
-       ('Biology Experiment', 1800000, 4, 1),
-       ('Genetics Research Project', 2000000, 4, 3),
-       ('Software Engineering Project', 1500000, 5, 1),
-       ('Machine Learning Application', 2000000, 5, 1);
-
 -- ============================================
 -- Group table
 -- ============================================
@@ -264,29 +191,6 @@ CREATE TABLE IF NOT EXISTS project_group
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='Group table';
-
--- Insert test data for project_group
-INSERT IGNORE INTO project_group (group_name, project_id)
-VALUES ('Group A', 1),
-       ('Group B', 1),
-       ('Team Alpha', 2),
-       ('Team Beta', 2),
-       ('Lab Group 1', 3),
-       ('Lab Group 2', 3),
-       ('Lab Group 3', 3),
-       ('QM Team 1', 4),
-       ('QM Team 2', 4),
-       ('Chem Group A', 5),
-       ('Chem Group B', 5),
-       ('Synthesis Team', 6),
-       ('Bio Team 1', 7),
-       ('Bio Team 2', 7),
-       ('Genetics Group', 8),
-       ('SE Team Alpha', 9),
-       ('SE Team Beta', 9),
-       ('SE Team Gamma', 9),
-       ('ML Team 1', 10),
-       ('ML Team 2', 10);
 
 -- ============================================
 -- Group-student association table
@@ -301,29 +205,6 @@ CREATE TABLE IF NOT EXISTS group_student
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='group-student association table';
 
--- Insert test data for group-student associations
--- student_id references student.id (PK), not the business student_id number
-INSERT IGNORE INTO group_student (student_id, group_id)
-VALUES
-    -- Calculus Project groups: Alice(id=1), Charlie(id=3) in Group A; Bob(id=2), Diana(id=4) in Group B
-    (1, 1), (3, 1),
-    (2, 2), (4, 2),
-    -- Linear Algebra groups: Emma(id=5), Frank(id=6) in Team Alpha; Grace(id=7), Henry(id=8) in Team Beta
-    (5, 3), (6, 3),
-    (7, 4), (8, 4),
-    -- Physics Lab groups: Alice(id=1) in Lab1, Bob(id=2) in Lab2, Charlie(id=3) in Lab3
-    (1, 5), (2, 6), (3, 7),
-    -- QM groups: Diana(id=4) in QM Team1, Emma(id=5) in QM Team2
-    (4, 8), (5, 9),
-    -- Chemistry groups: Frank(id=6) in ChemA, Grace(id=7) in ChemB, Henry(id=8) in Synthesis
-    (6, 10), (7, 11), (8, 12),
-    -- Biology groups: Alice(id=1) in Bio1, Bob(id=2) in Bio2, Charlie(id=3) in Genetics
-    (1, 13), (2, 14), (3, 15),
-    -- Computer Science groups: Iris(id=9) in SE Alpha, Jack(id=10) in SE Beta, Frank(id=6) in SE Gamma
-    (9, 16), (10, 17), (6, 18),
-    -- ML groups: Grace(id=7) in ML Team1, Henry(id=8) in ML Team2
-    (7, 19), (8, 20);
-
 -- ============================================
 -- Student-project association table
 -- ============================================
@@ -337,22 +218,6 @@ CREATE TABLE IF NOT EXISTS student_project
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='Student-project association table';
 
--- Insert test data for student-project association
--- student_id references student.id (PK), not the business student_id number
-INSERT IGNORE INTO student_project (student_id, subject_id, project_id)
-VALUES
-    -- Mathematics projects: Alice(1), Charlie(3) → Calculus(1); Bob(2), Diana(4), Emma(5), Grace(7) → LinearAlgebra(2)
-    (1, 1, 1), (3, 1, 1), (2, 1, 2), (4, 1, 2),
-    (5, 1, 2), (6, 1, 1), (7, 1, 2), (8, 1, 1),
-    -- Physics projects: Alice(1), Bob(2), Charlie(3) → PhysicsLab(3); Diana(4), Emma(5) → QM(4)
-    (1, 2, 3), (2, 2, 3), (3, 2, 3), (4, 2, 4), (5, 2, 4),
-    -- Chemistry projects: Frank(6), Grace(7) → ChemResearch(5); Henry(8) → OrganicSynthesis(6)
-    (6, 3, 5), (7, 3, 5), (8, 3, 6),
-    -- Biology projects: Alice(1), Bob(2) → BioExperiment(7); Charlie(3) → GeneticsResearch(8)
-    (1, 4, 7), (2, 4, 7), (3, 4, 8),
-    -- Computer Science projects: Iris(9), Jack(10), Henry(8) → SEProject(9); Frank(6), Grace(7) → MLApplication(10)
-    (9, 5, 9), (10, 5, 9), (6, 5, 10), (7, 5, 10), (8, 5, 9);
-
 -- ============================================
 -- Student-Subject association table
 -- ============================================
@@ -364,31 +229,6 @@ CREATE TABLE IF NOT EXISTS student_subject
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='Student-Subject association table';
-
--- Insert test data for student-subject association
--- student_id references student.id (PK), not the business student_id number
-INSERT IGNORE INTO student_subject (student_id, subject_id)
-VALUES
-    -- Alice(id=1): Mathematics, Physics, Biology
-    (1, 1), (1, 2), (1, 4),
-    -- Bob(id=2): Mathematics, Physics, Biology
-    (2, 1), (2, 2), (2, 4),
-    -- Charlie(id=3): Mathematics, Physics
-    (3, 1), (3, 2),
-    -- Diana(id=4): Mathematics, Physics
-    (4, 1), (4, 2),
-    -- Emma(id=5): Mathematics, Physics
-    (5, 1), (5, 2),
-    -- Frank(id=6): Mathematics, Chemistry, Computer Science
-    (6, 1), (6, 3), (6, 5),
-    -- Grace(id=7): Mathematics, Chemistry, Computer Science
-    (7, 1), (7, 3), (7, 5),
-    -- Henry(id=8): Mathematics, Chemistry, Computer Science
-    (8, 1), (8, 3), (8, 5),
-    -- Iris(id=9): Computer Science
-    (9, 5),
-    -- Jack(id=10): Computer Science
-    (10, 5);
 
 -- ============================================
 -- User-project association table
@@ -403,23 +243,6 @@ CREATE TABLE IF NOT EXISTS user_project
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='User-project association table';
 
--- Insert test data for user-project association
-INSERT IGNORE INTO user_project (user_id, subject_id, project_id)
-VALUES
-    -- Admin oversees all projects
-    (1, 1, 1), (1, 1, 2), (1, 2, 3), (1, 2, 4), (1, 3, 5),
-    (1, 3, 6), (1, 4, 7), (1, 4, 8), (1, 5, 9), (1, 5, 10),
-    -- Marker1: Mathematics and Physics
-    (2, 1, 1), (2, 1, 2), (2, 2, 3), (2, 2, 4),
-    -- Marker2: Chemistry and Biology
-    (3, 3, 5), (3, 3, 6), (3, 4, 7), (3, 4, 8),
-    -- Marker3: Computer Science
-    (4, 5, 9), (4, 5, 10),
-    -- Marker4: Mathematics and Computer Science
-    (5, 1, 1), (5, 1, 2), (5, 5, 9),
-    -- Marker5: Physics and Chemistry
-    (6, 2, 3), (6, 2, 4), (6, 3, 5);
-
 -- ============================================
 -- User-Subject association table
 -- ============================================
@@ -431,23 +254,6 @@ CREATE TABLE IF NOT EXISTS user_subject
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='User-Subject association table';
-
--- Insert test data for user-subject association
-INSERT IGNORE INTO user_subject (user_id, subject_id)
-VALUES
-    -- Admin: all subjects
-    (1, 1), (1, 2), (1, 3), (1, 4), (1, 5),
-    -- Marker1: Mathematics, Physics
-    (2, 1), (2, 2),
-    -- Marker2: Chemistry, Biology
-    (3, 3), (3, 4),
-    -- Marker3: Computer Science
-    (4, 5),
-    -- Marker4: Mathematics, Computer Science
-    (5, 1), (5, 5),
-    -- Marker5: Physics, Chemistry
-    (6, 2), (6, 3);
-
 
 -- ============================================
 -- Mark record table
@@ -485,85 +291,6 @@ CREATE TABLE IF NOT EXISTS mark_detail
     DEFAULT CHARSET = utf8mb4
     COLLATE = utf8mb4_unicode_ci COMMENT = 'Mark detail table';
 
--- Insert test data for mark_record
--- project 9 (Software Engineering Project, template_id=1): Iris(id=9), Jack(id=10), Henry(id=8)
--- marker3=user_id=4, marker4=user_id=5 (both markers score the same students)
-INSERT IGNORE INTO mark_record (id, project_id, student_id, marker_id, total_score, mark_time)
-VALUES
-    -- marker3 scores Iris: submitted
-    -- total = 80*15% + 75*15% + 90*15% + 70*20% + 75*20% + 80*10% + 60*5% = 76.75
-    (1, 9, 9, 4, 76.75, '2025-10-01 10:00:00'),
-    -- marker3 scores Jack: saved (not submitted yet)
-    (2, 9, 10, 4, NULL,  NULL),
-    -- marker3 scores Henry: submitted
-    -- total = 78*15% + 82*15% + 80*15% + 75*20% + 85*20% + 72*10% + 80*5% = 79.20
-    (3, 9, 8, 4, 79.20, '2025-10-01 10:30:00'),
-    -- marker4 scores Iris: submitted (different score from marker3)
-    -- total = 85*15% + 80*15% + 70*15% + 85*20% + 80*20% + 75*10% + 70*5% = 79.25
-    (4, 9, 9, 5, 79.25, '2025-10-01 11:00:00'),
-    -- marker4 scores Jack: submitted
-    -- total = 72*15% + 68*15% + 75*15% + 70*20% + 65*20% + 70*10% + 65*5% = 69.50
-    (5, 9, 10, 5, 69.50, '2025-10-01 11:15:00'),
-    -- marker4 scores Henry: submitted
-    -- total = 80*15% + 78*15% + 85*15% + 80*20% + 82*20% + 75*10% + 75*5% = 80.10
-    (6, 9, 8, 5, 80.10, '2025-10-01 11:30:00');
-
--- Insert test data for mark_detail (template_id=1, criteria id=1~7)
--- mark_record id=1: marker3 scores Iris
-INSERT IGNORE INTO mark_detail (mark_record_id, criteria_id, score, comment, status)
-VALUES
-    (1, 1, 80.0, 'Good vocal delivery', 1),
-    (1, 2, 75.0, '', 1),
-    (1, 3, 90.0, 'Clear slides', 1),
-    (1, 4, 70.0, '', 1),
-    (1, 5, 75.0, '', 1),
-    (1, 6, 80.0, '', 1),
-    (1, 7, 60.0, '', 1);
-
--- mark_record id=3: marker3 scores Henry
-INSERT IGNORE INTO mark_detail (mark_record_id, criteria_id, score, comment, status)
-VALUES
-    (3, 1, 78.0, 'Clear and steady pace', 1),
-    (3, 2, 82.0, 'Well-structured presentation', 1),
-    (3, 3, 80.0, '', 1),
-    (3, 4, 75.0, 'Solid understanding of the topic', 1),
-    (3, 5, 85.0, 'Comprehensive coverage', 1),
-    (3, 6, 72.0, '', 1),
-    (3, 7, 80.0, '', 1);
-
--- mark_record id=4: marker4 scores Iris (same student as id=1, different marker)
-INSERT IGNORE INTO mark_detail (mark_record_id, criteria_id, score, comment, status)
-VALUES
-    (4, 1, 85.0, 'Excellent confidence and clarity', 1),
-    (4, 2, 80.0, 'Good logical flow', 1),
-    (4, 3, 70.0, 'Slides could use more visuals', 1),
-    (4, 4, 85.0, 'Demonstrates deep understanding', 1),
-    (4, 5, 80.0, '', 1),
-    (4, 6, 75.0, '', 1),
-    (4, 7, 70.0, '', 1);
-
--- mark_record id=5: marker4 scores Jack
-INSERT IGNORE INTO mark_detail (mark_record_id, criteria_id, score, comment, status)
-VALUES
-    (5, 1, 72.0, 'Speaking too quickly at times', 1),
-    (5, 2, 68.0, 'Lacks clear structure', 1),
-    (5, 3, 75.0, '', 1),
-    (5, 4, 70.0, '', 1),
-    (5, 5, 65.0, 'Content is too shallow', 1),
-    (5, 6, 70.0, '', 1),
-    (5, 7, 65.0, 'Needs improvement', 1);
-
--- mark_record id=6: marker4 scores Henry (same student as id=3, different marker)
-INSERT IGNORE INTO mark_detail (mark_record_id, criteria_id, score, comment, status)
-VALUES
-    (6, 1, 80.0, '', 1),
-    (6, 2, 78.0, 'Good structure overall', 1),
-    (6, 3, 85.0, 'Effective use of diagrams', 1),
-    (6, 4, 80.0, '', 1),
-    (6, 5, 82.0, 'Excellent use of examples', 1),
-    (6, 6, 75.0, '', 1),
-    (6, 7, 75.0, '', 1);
-
 
 -- ============================================
 -- Group mark record table
@@ -582,13 +309,6 @@ CREATE TABLE IF NOT EXISTS group_mark_record
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT = 'Group mark record table';
-
--- Insert test data for group_mark_record
--- project 9 (Software Engineering Project): SE Team Alpha (group_id=16)
-INSERT IGNORE INTO group_mark_record (id, project_id, group_id, marker_id, comment, mark_time)
-VALUES
-    (1, 9, 16, 4, 'Good team collaboration overall.', '2025-10-01 10:00:00'),  -- SE Team Alpha, Marker3
-    (2, 9, 16, 5, 'Clear documentation, could improve on testing coverage.', '2025-10-01 10:05:00');  -- SE Team Alpha, Marker4
 
 -- ============================================
 -- Marker-student assignment table (per-student marker for individual projects)

@@ -376,7 +376,7 @@ const CriteriaEditor = observer(() => {
                     <Row gutter={[24, 16]} className={styles.criteriaDetails}>
                       <Col xs={24} md={8}>
                         <Form.Item
-                          label="Weighting"
+                          label="Weight (%)"
                           name={`weighting_${element.id}`}
                           dependencies={Array.from(selectedElements).map(
                             (id) => `weighting_${id}`

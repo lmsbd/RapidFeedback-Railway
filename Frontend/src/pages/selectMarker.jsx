@@ -121,7 +121,7 @@ const selectMarker = observer(() => {
       <div className={styles.header}>
         <BackButton />
       </div>
-      <h2>Select Markers</h2>
+      <h2>Assign Markers</h2>
       <Table
         rowKey={(record) => String(record?.userId ?? record?.id)}
         rowSelection={rowSelection}

@@ -4,13 +4,20 @@
   min-height: 100vh;
   background: white;
   padding: 24px;
+  overflow-x: auto;
 }
 
 // ========== Header ==========
 .header {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   margin-bottom: 24px;
+  gap: 12px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
   gap: 16px;
 
   .pageTitle {
@@ -18,11 +25,15 @@
     margin: 0 !important;
     font-weight: 600;
     flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
 .headerActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
 }
@@ -137,14 +148,14 @@
     padding: 16px;
   }
 
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-
+  .headerRow {
     .pageTitle {
       font-size: 20px;
     }
+  }
+
+  .headerActions {
+    gap: 8px;
   }
 }
 

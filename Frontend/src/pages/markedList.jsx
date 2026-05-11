@@ -241,17 +241,21 @@ export default function MarkedList() {
       {
         title: 'Name',
         key: 'name',
+        width: 180,
+        ellipsis: true,
         render: (_, r) => getStudentName(r),
       },
       {
         title: 'Email',
         dataIndex: 'email',
+        width: 240,
         ellipsis: true,
       },
       {
         title: 'Action',
         key: 'action',
         width: 120,
+        fixed: 'right',
         render: (_, record) => (
           <Button
             type="link"
@@ -277,11 +281,14 @@ export default function MarkedList() {
       {
         title: 'Name',
         key: 'name',
+        width: 180,
+        ellipsis: true,
         render: (_, r) => getStudentName(r),
       },
       {
         title: 'Email',
         dataIndex: 'email',
+        width: 240,
         ellipsis: true,
       },
       {
@@ -294,6 +301,7 @@ export default function MarkedList() {
         title: 'Action',
         key: 'action',
         width: 120,
+        fixed: 'right',
         render: (_, record) => (
           <Button
             type="link"
@@ -319,11 +327,14 @@ export default function MarkedList() {
       {
         title: 'Group Name',
         dataIndex: 'name',
+        width: 220,
+        ellipsis: true,
       },
       {
         title: 'Action',
         key: 'action',
         width: 120,
+        fixed: 'right',
         render: (_, record) => (
           <Button
             type="link"
@@ -349,11 +360,14 @@ export default function MarkedList() {
       {
         title: 'Group Name',
         dataIndex: 'name',
+        width: 220,
+        ellipsis: true,
       },
       {
         title: 'Action',
         key: 'action',
         width: 120,
+        fixed: 'right',
         render: (_, record) => (
           <Button
             type="link"

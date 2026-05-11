@@ -16,6 +16,7 @@ import {
   Typography,
   message,
 } from 'antd';
+import { ClockCircleOutlined } from '@ant-design/icons';
 import BackButton from '../components/BackButton/BackButton';
 import {
   getGroupAssessmentScores,
@@ -537,12 +538,23 @@ export default function MarkPage() {
         {!isReview && (
           <div className={styles.countdown}>
             {remainingMs === null ? (
-              <Tag>--</Tag>
+              <Space size={6} align="center">
+                <ClockCircleOutlined style={{ color: 'rgba(0, 0, 0, 0.45)' }} />
+                <Tag>--</Tag>
+              </Space>
             ) : remainingMs <= 0 ? (
-              <Tag color="red">Time is up</Tag>
+              <Space size={6} align="center">
+                <ClockCircleOutlined style={{ color: 'rgba(0, 0, 0, 0.45)' }} />
+                <Tag color="red">Time is up</Tag>
+              </Space>
             ) : (
               <div className={styles.countdownInner}>
-                <Text type="secondary">{formatMMSSFromMs(remainingMs)}</Text>
+                <Space size={6} align="center">
+                  <ClockCircleOutlined
+                    style={{ color: 'rgba(0, 0, 0, 0.45)' }}
+                  />
+                  <Text type="secondary">{formatMMSSFromMs(remainingMs)}</Text>
+                </Space>
                 <Button size="small" onClick={handleTimerToggle}>
                   {timerRunning ? 'Stop' : 'Start'}
                 </Button>

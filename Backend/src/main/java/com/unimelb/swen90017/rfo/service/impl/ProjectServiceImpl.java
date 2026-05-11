@@ -706,6 +706,9 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
         List<PdfReportGenerator.IndividualSummaryRow> summaryRows = new ArrayList<>();
         List<BigDecimal> finalScores = new ArrayList<>();
 
+        Map<Long, List<PdfReportGenerator.IndividualSummaryRow>> markerSummaryRows = new LinkedHashMap<>();
+        Map<Long, List<BigDecimal>> markerFinalScores = new LinkedHashMap<>();
+
         Map<Long, List<MarkRecordPO>> byStudent = new LinkedHashMap<>();
         for (MarkRecordPO r : records) {
             if (r.getStudentId() == null) continue;
@@ -728,6 +731,8 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
                     continue;
                 }
                 BigDecimal finalScore = finalPO.getFinalScore();
+                String studentLabel = student.getFirstName() + " " + student.getSurname();
+                String studentIdStr = student.getStudentId() != null ? String.valueOf(student.getStudentId()) : null;
 
                 List<PdfReportGenerator.MarkerBlock> markerBlocks = new ArrayList<>();
                 Map<Long, List<BigDecimal>> criteriaScoresByMarker = new LinkedHashMap<>();
@@ -760,12 +765,24 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
                                 .computeIfAbsent(d.getCriteriaId(), k -> new ArrayList<>())
                                 .add(d.getScore());
                     }
+
+                    if (record.getMarkerId() != null) {
+                        Map<Long, BigDecimal> singleMarkerScores = new HashMap<>();
+                        for (MarkDetailPO d : details) {
+                            if (d.getScore() == null || d.getCriteriaId() == null) continue;
+                            singleMarkerScores.put(d.getCriteriaId(), d.getScore());
+                        }
+                        markerSummaryRows.computeIfAbsent(record.getMarkerId(), k -> new ArrayList<>())
+                                .add(new PdfReportGenerator.IndividualSummaryRow(
+                                        studentLabel, studentIdStr, markerName,
+                                        finalScore, singleMarkerScores));
+                        markerFinalScores.computeIfAbsent(record.getMarkerId(), k -> new ArrayList<>())
+                                .add(finalScore);
+                    }
                 }
 
                 byte[] pdf = PdfReportGenerator.generateIndividualReport(
                         student, project, criteria, markerBlocks, finalScore);
-
-                String studentLabel = student.getFirstName() + " " + student.getSurname();
                 String filename = student.getFirstName() + "_" + student.getSurname() + "_Assessment_Report.pdf";
                 String subject = "[RapidFeedback] Assessment Report — " + project.getName() + " — " + studentLabel;
                 String studentBody = "Hi " + student.getFirstName() + ",\n\n"
@@ -788,8 +805,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
                 }
 
                 summaryRows.add(new PdfReportGenerator.IndividualSummaryRow(
-                        studentLabel,
-                        student.getStudentId() != null ? String.valueOf(student.getStudentId()) : null,
+                        studentLabel, studentIdStr,
                         String.join(", ", markerNames),
                         finalScore,
                         criteriaAvg));
@@ -807,7 +823,23 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
         }
 
         sendProjectSummary(project, criteria, summaryRows, null, null,
-                markerCache.values(), admins, false, projectAverageFinal);
+                Collections.emptyList(), admins, false, projectAverageFinal);
+
+        Set<String> adminEmails = new HashSet<>();
+        for (UserPO admin : admins) {
+            if (admin.getEmail() != null) adminEmails.add(admin.getEmail().toLowerCase());
+        }
+        for (Map.Entry<Long, UserPO> me : markerCache.entrySet()) {
+            UserPO marker = me.getValue();
+            if (marker == null || marker.getEmail() == null) continue;
+            if (adminEmails.contains(marker.getEmail().toLowerCase())) continue;
+            List<PdfReportGenerator.IndividualSummaryRow> rows = markerSummaryRows.get(me.getKey());
+            if (rows == null || rows.isEmpty()) continue;
+            BigDecimal markerAvg = averageOf(markerFinalScores.get(me.getKey()));
+            sendProjectSummary(project, criteria, rows, null, null,
+                    Collections.singletonList(marker), Collections.emptyList(), false, markerAvg);
+        }
+
         log.info("Finished sending individual reports for project {}", project.getId());
     }
 
@@ -838,19 +870,15 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
         String safeName = project.getName() != null ? project.getName().replaceAll("\\s+", "_") : "project";
         String summaryFilename = safeName + "_Summary_Report.pdf";
         String summarySubject = "[RapidFeedback] Project Summary Report — " + project.getName();
-        String coverage = isGroup ? "all marked groups" : "all marked students";
-
-        // Dedupe by email across marker + admin lists: the same address should only
-        // receive one summary email (same user may be both marker and admin, and two
-        // identical messages get collapsed by the mail client anyway).
         Set<String> sentEmails = new HashSet<>();
         if (markers != null) {
+            String markerCoverage = isGroup ? "groups you assessed" : "students you assessed";
             for (UserPO marker : markers) {
                 if (marker == null || marker.getEmail() == null) continue;
                 if (!sentEmails.add(marker.getEmail().toLowerCase())) continue;
                 String body = "Hi " + marker.getUsername() + ",\n\n"
                         + "Attached is the assessment summary for \"" + project.getName() + "\", "
-                        + "covering " + coverage + " in the project.\n\n"
+                        + "covering " + markerCoverage + ".\n\n"
                         + "Best regards,\nRapidFeedback";
                 try {
                     emailService.sendWithAttachment(marker.getEmail(), summarySubject, body, summaryPdf, summaryFilename);
@@ -860,12 +888,13 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
             }
         }
 
+        String adminCoverage = isGroup ? "all marked groups" : "all marked students";
         for (UserPO admin : admins) {
             if (admin.getEmail() == null) continue;
             if (!sentEmails.add(admin.getEmail().toLowerCase())) continue;
             String body = "Hi " + admin.getUsername() + ",\n\n"
                     + "Attached is the assessment summary for \"" + project.getName() + "\", "
-                    + "covering " + coverage + " in the project.\n\n"
+                    + "covering " + adminCoverage + " in the project.\n\n"
                     + "Best regards,\nRapidFeedback";
             try {
                 emailService.sendWithAttachment(admin.getEmail(), summarySubject, body, summaryPdf, summaryFilename);
@@ -884,6 +913,10 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
         List<PdfReportGenerator.GroupSummaryRowV2> groupSummaryRows = new ArrayList<>();
         List<PdfReportGenerator.IndividualInGroupSummaryRow> studentSummaryRows = new ArrayList<>();
         List<BigDecimal> finalScores = new ArrayList<>();
+
+        Map<Long, List<PdfReportGenerator.GroupSummaryRowV2>> markerGroupRows = new LinkedHashMap<>();
+        Map<Long, List<PdfReportGenerator.IndividualInGroupSummaryRow>> markerStudentRows = new LinkedHashMap<>();
+        Map<Long, List<BigDecimal>> markerFinalScores = new LinkedHashMap<>();
 
         for (Long groupId : groupIds) {
             try {
@@ -932,6 +965,11 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
                 Map<Long, List<BigDecimal>> groupCriteriaPool = new LinkedHashMap<>();
                 // Per-student final scores inside this group, used for the group average on the summary PDF.
                 List<BigDecimal> memberFinalScores = new ArrayList<>();
+
+                // Per-marker accumulators within this group
+                Map<Long, List<BigDecimal>> perMarkerMemberFinals = new LinkedHashMap<>();
+                Map<Long, Map<Long, List<BigDecimal>>> perMarkerGroupCriteriaPool = new LinkedHashMap<>();
+                Map<Long, List<BigDecimal>> perMarkerGroupScorePool = new LinkedHashMap<>();
 
                 String subject = "[RapidFeedback] Group Assessment Report — " + project.getName() + " — " + group.getGroupName();
 
@@ -988,6 +1026,36 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
                             groupCriteriaPool.computeIfAbsent(d.getCriteriaId(), k -> new ArrayList<>())
                                     .add(d.getScore());
                         }
+
+                        if (r.getMarkerId() != null) {
+                            Long mid = r.getMarkerId();
+                            Map<Long, BigDecimal> singleMarkerCriteria = new HashMap<>();
+                            for (MarkDetailPO d : details) {
+                                if (d.getScore() == null || d.getCriteriaId() == null) continue;
+                                singleMarkerCriteria.put(d.getCriteriaId(), d.getScore());
+                                perMarkerGroupCriteriaPool
+                                        .computeIfAbsent(mid, k -> new LinkedHashMap<>())
+                                        .computeIfAbsent(d.getCriteriaId(), k -> new ArrayList<>())
+                                        .add(d.getScore());
+                            }
+                            String memberLabel = member.getFirstName() + " " + member.getSurname();
+                            String memberStudentId = member.getStudentId() != null
+                                    ? String.valueOf(member.getStudentId()) : null;
+                            markerStudentRows.computeIfAbsent(mid, k -> new ArrayList<>())
+                                    .add(new PdfReportGenerator.IndividualInGroupSummaryRow(
+                                            memberLabel, memberStudentId, group.getGroupName(),
+                                            markerName, memberFinalScore,
+                                            r.getTotalScore(), r.getGroupScore(),
+                                            singleMarkerCriteria));
+                            perMarkerMemberFinals.computeIfAbsent(mid, k -> new ArrayList<>())
+                                    .add(memberFinalScore);
+                            if (r.getGroupScore() != null) {
+                                perMarkerGroupScorePool.computeIfAbsent(mid, k -> new ArrayList<>())
+                                        .add(r.getGroupScore());
+                            }
+                            markerFinalScores.computeIfAbsent(mid, k -> new ArrayList<>())
+                                    .add(memberFinalScore);
+                        }
                     }
 
                     if (member.getEmail() == null) {
@@ -1024,22 +1092,44 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
                     finalScores.add(memberFinalScore);
                 }
 
+                String memberNames = members.stream().map(s -> s.getFirstName() + " " + s.getSurname())
+                        .collect(Collectors.joining(", "));
+
                 groupSummaryRows.add(new PdfReportGenerator.GroupSummaryRowV2(
-                        group.getGroupName(),
-                        members.stream().map(s -> s.getFirstName() + " " + s.getSurname())
-                                .collect(Collectors.joining(", ")),
+                        group.getGroupName(), memberNames,
                         averageOf(memberFinalScores),
                         groupTotalScore,
                         averageMap(groupCriteriaPool)));
 
                 // Include markers who scored any member even if they did not write a group comment
+                Set<Long> groupMarkerIds = new LinkedHashSet<>();
+                for (List<MarkRecordPO> recs : byStudent.values()) {
+                    for (MarkRecordPO r : recs) {
+                        if (r.getMarkerId() != null) groupMarkerIds.add(r.getMarkerId());
+                    }
+                }
                 List<Long> mids = groupMarkRecordDao.getMarkerIdsByGroup(project.getId(), groupId);
                 if (mids != null) {
                     for (Long mid : mids) {
-                        if (mid == null || markerCache.containsKey(mid)) continue;
-                        UserPO m = userDao.selectById(mid);
-                        if (m != null) markerCache.put(mid, m);
+                        if (mid == null) continue;
+                        groupMarkerIds.add(mid);
+                        if (!markerCache.containsKey(mid)) {
+                            UserPO m = userDao.selectById(mid);
+                            if (m != null) markerCache.put(mid, m);
+                        }
                     }
+                }
+
+                for (Long mid : groupMarkerIds) {
+                    BigDecimal markerGroupFinalAvg = averageOf(perMarkerMemberFinals.get(mid));
+                    BigDecimal markerGroupTotal = averageOf(perMarkerGroupScorePool.get(mid));
+                    Map<Long, BigDecimal> markerCriteriaAvg = averageMap(
+                            perMarkerGroupCriteriaPool.getOrDefault(mid, Collections.emptyMap()));
+                    markerGroupRows.computeIfAbsent(mid, k -> new ArrayList<>())
+                            .add(new PdfReportGenerator.GroupSummaryRowV2(
+                                    group.getGroupName(), memberNames,
+                                    markerGroupFinalAvg, markerGroupTotal,
+                                    markerCriteriaAvg));
                 }
             } catch (Exception e) {
                 log.error("Failed to process group report for groupId={}: {}", groupId, e.getMessage());
@@ -1049,7 +1139,27 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectDao, ProjectPO> imple
         BigDecimal projectAverageFinal = averageOf(finalScores);
 
         sendProjectSummary(project, criteria, null, groupSummaryRows, studentSummaryRows,
-                markerCache.values(), admins, true, projectAverageFinal);
+                Collections.emptyList(), admins, true, projectAverageFinal);
+
+        Set<String> adminEmails = new HashSet<>();
+        for (UserPO admin : admins) {
+            if (admin.getEmail() != null) adminEmails.add(admin.getEmail().toLowerCase());
+        }
+        for (Map.Entry<Long, UserPO> me : markerCache.entrySet()) {
+            UserPO marker = me.getValue();
+            if (marker == null || marker.getEmail() == null) continue;
+            if (adminEmails.contains(marker.getEmail().toLowerCase())) continue;
+            List<PdfReportGenerator.GroupSummaryRowV2> mGroupRows = markerGroupRows.get(me.getKey());
+            List<PdfReportGenerator.IndividualInGroupSummaryRow> mStudentRows = markerStudentRows.get(me.getKey());
+            if ((mGroupRows == null || mGroupRows.isEmpty())
+                    && (mStudentRows == null || mStudentRows.isEmpty())) continue;
+            BigDecimal markerAvg = averageOf(markerFinalScores.get(me.getKey()));
+            sendProjectSummary(project, criteria, null,
+                    mGroupRows != null ? mGroupRows : Collections.emptyList(),
+                    mStudentRows != null ? mStudentRows : Collections.emptyList(),
+                    Collections.singletonList(marker), Collections.emptyList(), true, markerAvg);
+        }
+
         log.info("Finished sending group reports for project {}", project.getId());
     }
 

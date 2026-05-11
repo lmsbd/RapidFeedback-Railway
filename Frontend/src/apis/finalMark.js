@@ -1,4 +1,6 @@
+import axios from 'axios';
 import request from '@/utils/request';
+import userStore from '@/stores/userStore';
 
 function extractData(res) {
   if (res?.data !== undefined) return res.data;
@@ -38,4 +40,26 @@ export async function lockFinalMark({ projectId, studentId, groupId, isLocked })
 
 export async function publishReport(projectId) {
   return request.post('/projects/sendReport', { projectId: Number(projectId) });
+}
+
+export async function exportRawFinalMarkExcel(projectId, projectType) {
+  const exportType = String(projectType || '').toLowerCase() === 'group' ? 'group' : 'individual';
+  return request.get(`/export/${exportType}/${Number(projectId)}`, {
+    responseType: 'blob',
+  });
+}
+
+export async function importMarkExcel(projectId, projectType, file) {
+  const importType = String(projectType || '').toLowerCase() === 'group' ? 'group' : 'individual';
+  const formData = new FormData();
+  formData.append('file', file);
+  const headers = {};
+  if (userStore.token) {
+    headers.Authorization = `Bearer ${userStore.token}`;
+  }
+  const res = await axios.post(`/api/import/${importType}/${Number(projectId)}`, formData, {
+    headers,
+    timeout: 60000,
+  });
+  return res.data;
 }

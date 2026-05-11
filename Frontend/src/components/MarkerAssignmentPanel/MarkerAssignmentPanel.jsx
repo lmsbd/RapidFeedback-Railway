@@ -1,5 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Checkbox, Empty, Select, Space, Table, Tag, Typography } from 'antd';
+import {
+  Button,
+  Card,
+  Checkbox,
+  Empty,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
 import styles from './MarkerAssignmentPanel.module.less';
 
 const { Text } = Typography;
@@ -62,8 +72,10 @@ export default function MarkerAssignmentPanel({
   const selectedCount = Array.isArray(rowSelection?.selectedRowKeys)
     ? rowSelection.selectedRowKeys.length
     : 0;
-  const allChecked = allRowKeys.length > 0 && selectedCount === allRowKeys.length;
-  const partiallyChecked = selectedCount > 0 && selectedCount < allRowKeys.length;
+  const allChecked =
+    allRowKeys.length > 0 && selectedCount === allRowKeys.length;
+  const partiallyChecked =
+    selectedCount > 0 && selectedCount < allRowKeys.length;
 
   const mergedRowSelection = useMemo(() => {
     if (!rowSelection) return undefined;
@@ -135,9 +147,15 @@ export default function MarkerAssignmentPanel({
               onChange={onBulkMarkerIdsChange}
               style={{ minWidth: 260 }}
             />
-            <Button onClick={() => onApplyBulkAssignment('append')}>Append to selected</Button>
-            <Button onClick={() => onApplyBulkAssignment('replace')}>Replace selected</Button>
-            <Button onClick={() => onApplyBulkAssignment('remove')}>Remove selected markers</Button>
+            <Button onClick={() => onApplyBulkAssignment('append')}>
+              Assign to selected
+            </Button>
+            <Button onClick={() => onApplyBulkAssignment('replace')}>
+              Replace selected
+            </Button>
+            <Button onClick={() => onApplyBulkAssignment('remove')}>
+              Remove selected markers
+            </Button>
             <Button danger onClick={() => onApplyBulkAssignment('clear')}>
               Clear selected rows
             </Button>
@@ -157,13 +175,16 @@ export default function MarkerAssignmentPanel({
                       <Table
                         rowKey={(student) => String(student.studentId)}
                         size="small"
-                        dataSource={Array.isArray(group.students) ? group.students : []}
+                        dataSource={
+                          Array.isArray(group.students) ? group.students : []
+                        }
                         columns={groupMemberColumns}
                         pagination={false}
                       />
                     ),
                     rowExpandable: (group) =>
-                      Array.isArray(group.students) && group.students.length > 0,
+                      Array.isArray(group.students) &&
+                      group.students.length > 0,
                   }
                 : undefined
             }

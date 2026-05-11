@@ -481,6 +481,40 @@ const CreateProject = observer(() => {
       });
   };
 
+  const onFinishFailed = ({ errorFields }) => {
+    if (!Array.isArray(errorFields) || errorFields.length === 0) {
+      if (!assessmentStore.hasElements) {
+        message.warning('Please configure assessment criteria first.');
+      }
+      return;
+    }
+
+    const hasFieldError = (fieldName) =>
+      errorFields.some(
+        (field) =>
+          Array.isArray(field?.name) &&
+          field.name.length > 0 &&
+          field.name[0] === fieldName
+      );
+
+    if (hasFieldError('name')) {
+      message.warning('Please enter a project name.');
+      return;
+    }
+
+    if (hasFieldError('timer')) {
+      message.warning('Please enter presentation duration.');
+      return;
+    }
+
+    if (!assessmentStore.hasElements) {
+      message.warning('Please configure assessment criteria first.');
+      return;
+    }
+
+    message.error(errorFields[0]?.errors?.[0] || 'Please complete all required fields.');
+  };
+
   const handleBack = () => {
     // Confirm if you want to give up the current edit
     if (Object.keys(formValues).length > 0 || assessmentStore.hasElements) {
@@ -570,6 +604,7 @@ const CreateProject = observer(() => {
           form={form}
           layout="vertical"
           onFinish={onFinish}
+          onFinishFailed={onFinishFailed}
           className={styles.form}
         >
           {/* Project name */}

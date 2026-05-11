@@ -429,7 +429,7 @@ const ManageSubject = observer(() => {
           Back
         </Button>
         <Title level={2} className={styles.pageTitle}>
-          Manage Subject
+          Edit Subject
         </Title>
         <Button
           className={styles.saveButton}
@@ -490,7 +490,7 @@ const ManageSubject = observer(() => {
                 history.push(`/selectMarker?fromManage=true&id=${id}&source=markers`);
               }}
             >
-              Assign Markers
+              Manage Markers
             </Button>
           </div>
         </Form>

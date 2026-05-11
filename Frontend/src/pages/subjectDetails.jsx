@@ -187,9 +187,9 @@ export default function SubjectDetails() {
           <Title level={2} className={styles.pageTitle}>
             {subjectName}
           </Title>
-          <Tooltip title="Manage Subject">
+          <Tooltip title="Edit Subject">
             <Button
-              aria-label="Manage Subject"
+              aria-label="Edit Subject"
               className={`${styles.createButton} ${styles.editSubjectButton}`}
               icon={<EditOutlined />}
               onClick={handleManageSubject}
