@@ -13,7 +13,7 @@ services:
       TZ: Australia/Melbourne
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./src/main/resources/sql:/docker-entrypoint-initdb.d
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     # Use custom startup script (remove command to use Dockerfile CMD)
 
 volumes:

@@ -1,9 +1,6 @@
 {
   "private": true,
   "author": "Maoyingxuan <yinmao1@student.unimelb.edu.au>",
-  "engines": {
-  "node": ">=20 <21"
-  },
   "scripts": {
     "dev": "umi dev",
     "build": "umi build",

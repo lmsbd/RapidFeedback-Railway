@@ -4,8 +4,7 @@ import userStore from '@/stores/userStore';
 const API_BASE_URL =
   process.env.NODE_ENV === 'development'
     ? '/api'
-    : process.env.UMI_APP_API_BASE_URL ||
-      'https://rapidfeedback-railway-production.up.railway.app/rfo/api';
+    : process.env.UMI_APP_API_BASE_URL;
 
 const request = axios.create({
   baseURL: API_BASE_URL,

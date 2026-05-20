@@ -56,7 +56,7 @@ src/main/resources/
 
 ### Quick Start
 
-Run from the `Backend` directory:
+Run from the `Backend/src/main/resources/sql` directory:
 
 ```bash
 docker-compose up -d

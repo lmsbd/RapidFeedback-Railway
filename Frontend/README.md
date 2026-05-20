@@ -36,12 +36,8 @@ src/
 
 ### Prerequisites
 
-- Node.js 20 LTS
+- Node.js 18+
 - pnpm or npm
-
-This project includes a `.nvmrc` file to pin the frontend runtime to Node 20.
-If you use a Node version manager, it can read that file and switch automatically
-when you enter the `Frontend` directory.
 
 ### Install
 
